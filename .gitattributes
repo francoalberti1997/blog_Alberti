@@ -1,0 +1,12 @@
+*.h5 filter=lfs diff=lfs merge=lfs -text
+capa_nitrurada/modelos/*.h5 filter=lfs diff=lfs merge=lfs -text
+venv/* !text -filter -merge -diff
+
+*modelos/*.h5 filter=lfs diff=lfs merge=lfs -text
+capa_nitrurada/modelos/*.h5 filter=lfs diff=lfs merge=lfs
+*.pt filter=lfs diff=lfs merge=lfs -text
+capa_nitrurada/modelos/*.pt filter=lfs diff=lfs merge=lfs -
+
+grano_ferromagnetico/modelos/*.h5 filter=lfs diff=lfs merge=lfs -text
+grano_ferromagnetico/modelos/*.pt filter=lfs diff=lfs merge=l   fs -text    
+grano_ferromagnetico/datos_simulados/*.npy filter=lfs diff=lfs merge=lfs -text
