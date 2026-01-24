@@ -32,15 +32,17 @@ CSRF_TRUSTED_ORIGINS = [
     'https://albertidl.vercel.app',
     'https://crucially-treacherous-madie.ngrok-free.dev',
     'http://18.222.79.144/',    
-    'changuify-2.onrender.com'
+    'blog-alberti.onrender.com'
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://changuify-2.onrender.com",
+    "https://blog-alberti.onrender.com",
     
 ]
 # settings.py
 CSRF_COOKIE_SECURE = False
+
+
 
 
 
