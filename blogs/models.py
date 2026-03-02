@@ -20,4 +20,4 @@ class Blog(models.Model):
     youtube_id = models.CharField(max_length=20, blank=True, null=True)
     
     def __str__(self):
-        return f"{self.title} by {self.author}"
+        return f"{self.title} by {self.author} - ID: {self.id}"
