@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'blogs',
     'corsheaders',
     'rest_framework',
+    'modelos',
 ]
 
 MIDDLEWARE = [
