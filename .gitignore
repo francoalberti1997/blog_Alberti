@@ -23,3 +23,8 @@ capa_nitrurada/modelos/*.h5
 venv/
 *.dll
 *.exe
+
+imagenes/
+micrografias/
+muestras/
+regiones/
