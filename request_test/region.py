@@ -1,15 +1,15 @@
 import requests
 
-url = "http://localhost:8000/modelos/regiones/"
+url = "https://francoalberti97.pythonanywhere.com/modelos/regiones/"
 
 regiones = [
     {
         "nombre": "Zona A",
-        "imagen": "imagenes/region_1.jpg"
+        "imagen": "./imagenes/region_1.jpg"
     },
     {
         "nombre": "Zona B",
-        "imagen": "imagenes/region_2.jpg"
+        "imagen": "./imagenes/region_2.jpg"
     }
 ]
 

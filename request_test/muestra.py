@@ -1,6 +1,6 @@
 import requests
 
-url = "http://localhost:8000/modelos/muestras/"
+url = "https://francoalberti97.pythonanywhere.com/modelos/muestras/"
 
 data = {
     "nombre": "Muestra 1",
@@ -10,10 +10,10 @@ data = {
 }
 
 files = {
-    "imagen": open("imagenes/muestra.jpg", "rb")
+    "imagen": open("../imagenes/muestra.jpg", "rb")
 }
 
 response = requests.post(url, data=data, files=files)
 
 print("Status:", response.status_code)
-print(response.json())
+print(response.text)
