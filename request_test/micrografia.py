@@ -5,15 +5,15 @@ url = "https://francoalberti97.pythonanywhere.com/modelos/micrografias/"
 micrografias = [
     {
         "nombre": "Micro 100x",
-        "imagen": "./imagenes/micro_1.jpg"
+        "imagen": "../imagenes/micro_1.jpg"
     },
     {
         "nombre": "Micro 500x",
-        "imagen": "./imagenes/micro_2.jpg"
+        "imagen": "../imagenes/micro_2.jpg"
     },
     {
         "nombre": "Micro 1000x",
-        "imagen": "./imagenes/micro_3.jpg"
+        "imagen": "../imagenes/micro_3.jpg"
     }
 ]
 

@@ -1,11 +1,18 @@
 from django.db import models
 
+class Categoria(models.Model):
+    nombre = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.nombre
+
 class Muestra(models.Model):
     nombre = models.CharField(max_length=100)
     material = models.CharField(max_length=100)
     informacion = models.TextField()
     fecha = models.DateField()
     imagen = models.ImageField(upload_to="muestras/")
+    categoria = models.ForeignKey("Categoria", on_delete=models.SET_NULL, null=True, related_name="muestras")
 
     def __str__(self):
         return self.nombre
