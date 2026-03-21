@@ -1,6 +1,6 @@
 import requests
 
-url = "https://francoalberti97.pythonanywhere.com/modelos/micrografias/"
+url = "http://localhost:8000/metalografia/micrografias/"
 
 micrografias = [
     {

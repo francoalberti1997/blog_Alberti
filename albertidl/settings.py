@@ -44,8 +44,6 @@ CSRF_COOKIE_SECURE = False
 
 
 
-
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -58,7 +56,10 @@ INSTALLED_APPS = [
     'blogs',
     'corsheaders',
     'rest_framework',
-    'modelos',
+    'metalografia',
+    "rest_framework.authtoken",
+    "member",
+    'reports',
 ]
 
 MIDDLEWARE = [
@@ -168,5 +169,41 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # Add this line
+    ],
+}
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+INSTALLED_APPS += ["django_celery_results"]
+
+CELERY_RESULT_BACKEND = "django-db"
+
+import os
+
+# Ruta absoluta a la carpeta donde están tus imágenes subidas
+MEDIA_ROOT = r"C:\Users\Alber\Documents\IA Metalurgia\Presentación\albertidl\back_copy"
+# MEDIA_URL = '/media/'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = "albertifranco97@gmail.com"
+EMAIL_HOST_PASSWORD = "yfaj cwbu zsqd zazl"

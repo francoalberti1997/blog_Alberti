@@ -1,6 +1,6 @@
 import requests
 
-url = "https://francoalberti97.pythonanywhere.com/modelos/regiones/"
+url = "http://localhost:8000/metalografia/regiones/"
 
 regiones = [
     {

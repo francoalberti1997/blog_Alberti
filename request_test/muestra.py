@@ -1,10 +1,10 @@
 import requests
 
-url = "https://francoalberti97.pythonanywhere.com/modelos/muestras/"
+url = "http://localhost:8000/metalografia/muestras/"
 
 data = {
     "nombre": "Muestra 1",
-    "material": "Acero",
+    # "material": "Acero",
     "informacion": "Ensayo metalográfico",
     "fecha": "2026-03-04"
 }
