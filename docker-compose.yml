@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: django_app
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: .
+    container_name: celery_worker
+    command: celery -A albertidl worker --loglevel=info --pool=solo
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
