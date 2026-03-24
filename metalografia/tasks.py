@@ -14,7 +14,7 @@ from celery import shared_task
 from django.core.files.base import ContentFile
 from django.conf import settings
 import traceback
-from reports.utils import send_mail
+from reports.utils.send_mail import send_report_email
 
 
 BASE_PREDICT_URL = "https://francoalb-magnesia.hf.space/segment/45956/"
@@ -332,3 +332,7 @@ def generate_microstructural_report_pdf(pdf_id: int):
 
     pdf_obj.status = "done"
     pdf_obj.save()
+
+    send_report_email(pdf_id=pdf_obj.id)
+    return 1
+    
