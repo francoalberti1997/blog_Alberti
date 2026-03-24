@@ -13,6 +13,9 @@ from reportlab.platypus import Image
 from PIL import Image
 import numpy as np
 
+from reportlab.platypus import Image as RLImage
+from PIL import Image as PILImage
+
 # ====================== CALIDADES FIJAS ======================
 CALIDADES_FIJAS = [
     {"id": 1, "tipo": "sinterizado", "min": 40,  "max": 90,   "label": "Calidad 1: 40–90 µm"},
@@ -105,17 +108,19 @@ def image_keep_aspect(path, max_width_cm, max_height_cm):
     img = PILImage.open(path)
     w, h = img.size
     aspect = w / h
+
     max_w = max_width_cm * cm
     max_h = max_height_cm * cm
+
     if (max_w / aspect) <= max_h:
         width = max_w
         height = max_w / aspect
     else:
         height = max_h
         width = max_h * aspect
-    return Image(path, width=width, height=height)
 
-from PIL import Image
+    return RLImage(path, width=width, height=height)
+
 import numpy as np
 from django.http import Http404
 

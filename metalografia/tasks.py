@@ -19,7 +19,7 @@ from reports.utils import send_mail
 
 BASE_PREDICT_URL = "https://francoalb-magnesia.hf.space/segment/45956/"
 
-HF_TOKEN = "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"
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 @shared_task
 def process_micrografia_mask(mask_id):
@@ -204,7 +204,7 @@ def generate_microstructural_report_pdf(pdf_id: int):
                 print(f"um_by_px: { micro.um_by_px}")
                 print("\n")
                 
-                if measure.mean_size and micro.um_by_px:
+                if measure.mean_size and micro.um_by_px:    
                     print("Ingresó")
                     tc_um, _ = measure.convert_from_px_to_um()
                     calidad = assign_calidad(tc_um)
