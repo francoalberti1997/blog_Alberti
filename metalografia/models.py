@@ -88,8 +88,6 @@ class GrainSize(models.Model):
             mean_um, _ = measure.convert_from_px_to_um()
             values_um.append(mean_um)
 
-            print(f"Falló para: {micro} en region: {self.region.nombre}")
-
 
         if not values_um and self.region.micrografias.exists():
             print(values_um)

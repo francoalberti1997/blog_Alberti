@@ -31,14 +31,23 @@ CSRF_TRUSTED_ORIGINS = [
     'https://ec2-18-222-79-144.us-east-2.compute.amazonaws.com',
     'https://albertidl.vercel.app',
     'https://crucially-treacherous-madie.ngrok-free.dev',
-    'http://18.222.79.144/',    
-    'blog-alberti.onrender.com'
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://blog-alberti.onrender.com",
+    "https://shela-unmultiplying-chandler.ngrok-free.dev",
+    "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
     
 ]
+
+CORS_ALLOWED_ORIGINS  = [
+    'https://ec2-18-222-79-144.us-east-2.compute.amazonaws.com',
+    'https://albertidl.vercel.app',
+    'https://crucially-treacherous-madie.ngrok-free.dev',
+    "https://shela-unmultiplying-chandler.ngrok-free.dev",
+    "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
+    
+]
+
+
+
+
 # settings.py
 CSRF_COOKIE_SECURE = False
 
@@ -63,8 +72,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # debe ir primero
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
