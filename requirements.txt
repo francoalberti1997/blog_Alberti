@@ -1,16 +1,26 @@
 Django==5.0.5
 djangorestframework==3.16.1
-matplotlib==3.10.8
-numpy==2.4.3
-opencv_python==4.13.0.90
-Pillow==12.1.1
-reportlab==4.4.10
-requests==2.32.5
-scipy==1.17.1
+django-cors-headers==4.4.0
+whitenoise==6.6.0
 
-# Celery stack
+# Celery + Redis
 celery==5.3.6
 redis==5.0.4
 django-celery-results==2.5.1
 
-django-cors-headers==4.4.0
+# Ciencia / procesamiento
+numpy==2.4.3
+scipy==1.17.1
+matplotlib==3.10.8
+
+# OpenCV (usar headless SIEMPRE en backend)
+opencv-python-headless==4.13.0.90
+
+# Imágenes
+Pillow==12.1.1
+
+# PDF
+reportlab==4.4.10
+
+# HTTP
+requests==2.32.5
