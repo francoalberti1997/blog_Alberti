@@ -8,7 +8,7 @@ from . import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('blogs/', include('blogs.urls')),
-    # path('modelos/', include('modelos.urls')),
+    path('member/', include('member.urls')),
     path('metalografia/', include('metalografia.urls')),
     path("ping/", views.ping_view, name="ping"),
     path("create-superuser/", views.create_superuser_view, name="create_superuser"),
