@@ -47,9 +47,20 @@ class GeneratePDF(APIView):
         })
 
 class TrackPDF(APIView):
-    def get(self, request, id):
-        pdf_obj = get_object_or_404(ReportPDF, id=id)
+    permission_classes = [IsAuthenticated]
 
-        serializer = ReportPDFSerializer(pdf_obj)
+    def get(self, request, id=None):
+        user = request.user
+
+        # Caso 1: viene ID → uno solo
+        if id:
+            pdf_obj = get_object_or_404(ReportPDF, id=id, owner__user=user)
+            serializer = ReportPDFSerializer(pdf_obj)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Caso 2: no viene ID → todos del usuario
+        pdfs = ReportPDF.objects.filter(owner__user=request.user)
+        serializer = ReportPDFSerializer(pdfs, many=True)
+        
 
         return Response(serializer.data, status=status.HTTP_200_OK)

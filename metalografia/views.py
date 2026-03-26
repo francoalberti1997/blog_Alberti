@@ -79,6 +79,8 @@ class BaseCompanyViewSet(viewsets.ModelViewSet):
 # =========================================================
 class MuestraViewSet(BaseCompanyViewSet):
     serializer_class = MuestraSerializer
+    permission_classes = [IsAuthenticated]
+
 
     def get_queryset(self):
         return Muestra.objects.filter(owner=self.get_company())
@@ -92,6 +94,8 @@ class MuestraViewSet(BaseCompanyViewSet):
 # =========================================================
 class RegionViewSet(BaseCompanyViewSet):
     serializer_class = RegionSerializer
+    permission_classes = [IsAuthenticated]
+
 
     def get_queryset(self):
         return Region.objects.filter(muestra__owner=self.get_company())
@@ -110,6 +114,7 @@ class RegionViewSet(BaseCompanyViewSet):
 # =========================================================
 class MicrografiaViewSet(BaseCompanyViewSet):
     serializer_class = MicrografiaSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         print(f"\n \n {self.request.user}\n \n")
@@ -136,12 +141,13 @@ class MicrografiaViewSet(BaseCompanyViewSet):
             measure_grain_size.s()
         ).apply_async()
 
-        
-
     def partial_update(self, request, *args, **kwargs):
-        if set(request.data.keys()) - {'um_by_px'}:
+        
+        forbidden = {'imagen', 'region', 'id'}
+
+        if set(request.data.keys()) & forbidden:
             return Response(
-                {"error": "Solo se permite actualizar 'um_by_px'"},
+                {"error": "No se permite actualizar 'imagen' ni 'region'"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -151,23 +157,17 @@ class MicrografiaViewSet(BaseCompanyViewSet):
 
         obj_id = kwargs.get('pk')
 
-        """
-        OBTENGO LOS MICRÓMETROS POR PÍXELES.
-        En la DB está mal nombrado! Al revés. Acá sólo lo emparchamos.
-        """
+        if um_by_px is not None:
+            px = get_um_by_px(obj_id, um_by_px)
 
-        px = get_um_by_px(obj_id, um_by_px)
-
-        # px = 1
-
-        if px is not None:
-            try:
-                data['um_by_px'] = float(px)
-            except (ValueError, TypeError):
-                return Response(
-                    {"error": "um_by_px debe ser numérico"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            if px is not None:
+                try:
+                    data['um_by_px'] = float(px)
+                except (ValueError, TypeError):
+                    return Response(
+                        {"error": "um_by_px debe ser numérico"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
         request._full_data = data  # reemplaza internamente
 
@@ -179,6 +179,7 @@ BASE_PREDICT_URL = "https://francoalb-magnesia.hf.space/segment"
 class PredictView(APIView):
 
     def post(self, request, micrografia_id):
+        # permission_classes = [IsAuthenticated]
 
         micrografia = get_object_or_404(Micrografia, id=micrografia_id)
 

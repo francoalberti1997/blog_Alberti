@@ -33,6 +33,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://crucially-treacherous-madie.ngrok-free.dev',
     "https://shela-unmultiplying-chandler.ngrok-free.dev",
     "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
+    "http://localhost:4321",  # ✅ SIN slash final
+    'http://localhost:8000',
     
 ]
 
@@ -42,16 +44,13 @@ CORS_ALLOWED_ORIGINS  = [
     'https://crucially-treacherous-madie.ngrok-free.dev',
     "https://shela-unmultiplying-chandler.ngrok-free.dev",
     "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
+    "http://localhost:4321",  # ✅ SIN slash final
+    'http://localhost:8000',
     
 ]
 
-
-
-
 # settings.py
 CSRF_COOKIE_SECURE = False
-
-
 
 # Application definition
 
@@ -192,8 +191,9 @@ INSTALLED_APPS += ["django_celery_results"]
 
 CELERY_RESULT_BACKEND = "django-db"
 
-CELERY_BROKER_URL = "redis://redis:6379/0"
+# CELERY_BROKER_URL = "redis://redis:6379/0"
 # CELERY_RESULT_BACKEND = "redis://redis:6379/0"
+CELERY_BROKER_URL = "redis://localhost:6379/0"
 
 import os
 
