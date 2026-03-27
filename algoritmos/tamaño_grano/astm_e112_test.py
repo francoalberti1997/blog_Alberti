@@ -20,7 +20,7 @@ marcar_recta = None
 def generar_grilla_intercepciones_constantes(
     img_file: str,
     mask_file: str,
-    output_dir: str = "results",
+    # output_dir: str = "results",
     num_rectas_objetivo: int = 100,
     grid_rows: int = 14,
     grid_cols: int = 14,
@@ -67,7 +67,7 @@ def generar_grilla_intercepciones_constantes(
     if max_global_attempts is None:
         max_global_attempts = num_rectas_objetivo * 40
 
-    os.makedirs(output_dir, exist_ok=True)
+    # os.makedirs(output_dir, exist_ok=True)
     
 
     # edge = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
@@ -257,7 +257,23 @@ def generar_grilla_intercepciones_constantes(
 
     # Seleccionamos las mejores
     rectas_data = sorted(rectas_data, key=lambda x: x["score"], reverse=True)[:num_rectas_objetivo]
-    print(f"Rectas finales válidas: {len(rectas_data)}   (de {intentos} intentos)")
+    
+    eficiencia = len(rectas_data) / intentos
+
+    eficiencia_minima = 0.1  # ajustable
+
+    if intentos > 0:
+        eficiencia = len(rectas_data) / intentos
+    else:
+        eficiencia = 0
+
+    if eficiencia < eficiencia_minima:
+        print("Falla: máscara de baja calidad (ineficiente)")
+        return {
+            "mean_grain_size_um": None,
+            "std_grain_size_um": None,
+            "is_valid":False
+        }
 
     # ─── Visualización ───────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(W/100, H/100), dpi=140)
@@ -285,8 +301,8 @@ def generar_grilla_intercepciones_constantes(
     ax.set_title(f"Rectas LONGITUD CONSTANTE = {fixed_length_px:.0f} px   |   margen {safety_margin_px} px")
     ax.axis("off")
 
-    vis_path = os.path.join(output_dir, "rectas_intercepciones_constantes.png")
-    plt.savefig(vis_path, bbox_inches=0, pad_inches=0, dpi=200)
+    # vis_path = os.path.join(output_dir, "rectas_intercepciones_constantes.png")
+    # plt.savefig(vis_path, bbox_inches=0, pad_inches=0, dpi=200)
     plt.close()
 
     
@@ -306,5 +322,6 @@ def generar_grilla_intercepciones_constantes(
 
     return {
         "mean_grain_size_um": diam_mean,
-        "std_grain_size_um": diam_std
+        "std_grain_size_um": diam_std,
+        "is_valid":True
     }

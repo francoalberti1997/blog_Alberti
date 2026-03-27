@@ -16,13 +16,10 @@ def send_report_email(pdf_id: int):
     Estimado/a {pdf_obj.owner.name},
 
     Adjuntamos el informe microestructural correspondiente a su solicitud.
-
-    El código de este documento para seguimiento es: {pdf_obj.value}
-
-    Ante cualquier consulta, observación o devolución, no dude en responder a este mismo correo. Su feedback es importante para nosotros.
-
+    El código de este documento para seguimiento es: {pdf_obj.value}. 
+    Ante cualquier consulta, observación o devolución, no dude en responder a este mismo correo. 
+    Su opinión es muy importante para nosotros. 
     Quedamos a su disposición.
-
     Atentamente,
     Franco Alberti
 
@@ -40,5 +37,20 @@ def send_report_email(pdf_id: int):
         with open(pdf_path, 'rb') as f:
             email.attach(os.path.basename(pdf_path), f.read(), 'application/pdf')
 
-    email.send()
-    return 1
+    try:
+        print("Enviando Mail")
+        result = email.send()
+
+        if result == 1:
+            pdf_obj.status = "done"
+            pdf_obj.save(update_fields=["status"])
+            return 1
+
+        return 0
+
+    except Exception as e:
+        pdf_obj.status = "error"
+        pdf_obj.save(update_fields=["status"])
+        # opcional: loggear error
+        print(f"Error enviando email: {e}")
+        return 0    

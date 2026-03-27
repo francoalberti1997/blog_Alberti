@@ -42,6 +42,7 @@ def build_pdf_content(data: dict) -> tuple[bytes, str]:
     muestra_imagen_path = data.get('muestra_imagen_path')
     regions             = data['regions']  # lista de dicts
     logo_url = data["logo_url"]
+    invalid_micrographs = data.get("invalid_micrographs", [])
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -275,6 +276,38 @@ def build_pdf_content(data: dict) -> tuple[bytes, str]:
 
         region_block.append(Spacer(1, 2.0*cm))
         elements.append(KeepTogether(region_block))
+
+    # MICROGRAFÍAS NO PROCESADAS
+    if invalid_micrographs:
+        elements.append(PageBreak())
+
+        elements.append(Paragraph("Micrografías no procesadas", h1))
+        elements.append(Spacer(1, 0.8*cm))
+
+        elements.append(Paragraph(
+            "Las siguientes micrografías no pudieron ser analizadas automáticamente "
+            "debido a problemas en la detección de bordes de cristal. No fueron consideradas en los cálculos.",
+            normal
+        ))
+        elements.append(Spacer(1, 1.2*cm))
+
+        for micro in invalid_micrographs:
+            block = []
+
+            # Imagen
+            if micro.get("path") and os.path.exists(micro["path"]):
+                block.append(KeepTogether([
+                    image_keep_aspect(micro["path"], 13.0, 9.3),
+                    Spacer(1, 0.4*cm),
+                    Paragraph(
+                        f"{micro.get('nombre', 'Micrografía sin nombre')}",
+                        caption
+                    ),
+                    Spacer(1, 1.0*cm)
+                ]))
+           
+
+            elements.append(KeepTogether(block))
 
     # CONCLUSIONES
     conclusion_text = f"""

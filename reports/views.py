@@ -7,13 +7,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from metalografia.models import Muestra
+from metalografia.models import Muestra, Micrografia
 from .models import ReportPDF
 from django.shortcuts import get_object_or_404
 from .models import ReportPDF
 from .serializers import ReportPDFSerializer
 from rest_framework import status
-
+from django.db import models
 
 class GeneratePDF(APIView):
     permission_classes = [IsAuthenticated]
@@ -31,9 +31,61 @@ class GeneratePDF(APIView):
 
         company = request.user.member.company
 
-        # 🔐 VALIDACIÓN CLAVE
         if muestra.owner != company:
             raise PermissionDenied("No tenés acceso a esta muestra")
+
+        if not muestra.muestra.exists():   # related_name="muestra" en el modelo Region
+            return Response({
+                "error": "La muestra no tiene regiones",
+                "detalle": "Debes crear al menos una región antes de generar el PDF."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # ================================================
+        # 2. Validar que todas las regiones tengan al menos una micrografía
+        # ================================================
+        regiones_sin_micrografias = muestra.muestra.annotate(
+            num_micrografias=models.Count('micrografias')
+        ).filter(num_micrografias=0)
+
+        if regiones_sin_micrografias.exists():
+            regiones_faltantes = [
+                {
+                    "region_id": region.id,
+                    "region_nombre": region.nombre,
+                    "muestra_nombre": muestra.nombre
+                }
+                for region in regiones_sin_micrografias
+            ]
+
+            return Response({
+                "error": "Algunas regiones no tienen micrografías",
+                "detalle": "Todas las regiones deben tener al menos una micrografía para generar el PDF.",
+                "regiones_sin_micrografias": regiones_faltantes
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        micrografias_sin_um = Micrografia.objects.filter(
+            region__muestra=muestra,
+            um_by_px__isnull=True
+        ).select_related('region', 'region__muestra')
+
+        if micrografias_sin_um.exists():
+            faltantes = []
+            for micro in micrografias_sin_um:
+                faltantes.append({
+                    "micrografia_id": micro.id,
+                    "micrografia_nombre": micro.nombre,
+                    "region_nombre": micro.region.nombre,
+                    "muestra_nombre": micro.region.muestra.nombre,
+                    "muestra_id": micro.region.muestra.id
+                })
+
+            
+            return Response({
+                "error": "Faltan calibraciones (um_by_px) en algunas micrografías",
+                "detalle": "No se puede generar el PDF porque las siguientes micrografías no tienen definido um_by_px",
+                "micrografias_faltantes": faltantes
+            }, status=status.HTTP_400_BAD_REQUEST)
+
 
         pdf_obj = ReportPDF.objects.create(
             owner=request.user.member,

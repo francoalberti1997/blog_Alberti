@@ -45,6 +45,8 @@ def process_micrografia_mask(mask_id):
                 files={"file": img_file}
             )
 
+    
+
         response.raise_for_status()
 
         result = response.content  # suponiendo que devuelve la máscara
@@ -57,6 +59,8 @@ def process_micrografia_mask(mask_id):
 
         mask.status = "done"
         mask.save()
+
+        
 
     except Exception as e:
 
@@ -93,13 +97,13 @@ def measure_grain_size(micrografia):
     mask_file = mask_instance.imagen
 
     # 3. Carpeta de salida (puedes cambiar el criterio)
-    output_dir = f"results_v4_constante/micro_{micrografia.id:04d}"
+    # output_dir = f"results_v4_constante/micro_{micrografia.id:04d}"
 
     # 4. Llamada (exactamente como la tenías, pero con rutas dinámicas)
     results = generar_grilla_intercepciones_constantes(
         img_file            = img_file,
         mask_file           = mask_file,
-        output_dir          = output_dir,
+        # output_dir          = output_dir,
         safety_margin_px    = 5,
         num_rectas_objetivo = 100,
     )
@@ -108,8 +112,16 @@ def measure_grain_size(micrografia):
     micro_measure = MicrographyMeasure.objects.create(
         micrografia = micrografia
     )
+    validity = results["is_valid"]
+
+    if validity is False:
+        micro_measure.is_valid = False
+        micro_measure.save()
+        return 1
+    
     micro_measure.mean_size = results["mean_grain_size_um"]
     micro_measure.standard_deviation = results["std_grain_size_um"]
+    micro_measure.is_valid = validity
 
     micro_measure.save()
     
@@ -369,11 +381,21 @@ def generate_microstructural_report_pdf(pdf_id: int):
 
     # === Recolectar todos los granos con medida ===
     grain_data = []
+    invalid_micrographs = []
     for region in Region.objects.filter(muestra=muestra):
         for micro in region.micrografias.all():
+            """
+            Filtrar por aquellas micrografías con measure_micro. MOSTRAR LAS QUE NO SE CONSIDERAN IGUAL PERO NO MEDIDAS.
+            """
             try:
-                measure = micro.measure_micro  # asumo que es el related_name correcto
-                if measure.mean_size is None or micro.um_by_px is None:
+                measure = micro.measure_micro  
+                if measure.mean_size is None or micro.um_by_px is None or (measure.is_valid is False):
+                    print(f"No será tenida en cuenta la micrografía: {micro.nombre}")
+                    invalid_micrographs.append({
+                        "nombre": micro.nombre,
+                    "path": micro.imagen.path if micro.imagen else None,
+                    })
+                    
                     continue
 
                 tc_um, _ = measure.convert_from_px_to_um()
@@ -486,14 +508,15 @@ def generate_microstructural_report_pdf(pdf_id: int):
         'dist_plot_path': dist_plot_path,
         'muestra_imagen_path': muestra.imagen.path if getattr(muestra, 'imagen', None) and os.path.exists(muestra.imagen.path) else None,
         'regions': regions_data,
-        "logo_url": logo_url
+        "logo_url": logo_url,
+        "invalid_micrographs": invalid_micrographs
     }
 
     # === Generar PDF ===
     pdf_bytes, filename = build_pdf_content(data)
 
     pdf_obj.file.save(filename, ContentFile(pdf_bytes), save=False)
-    pdf_obj.status = "done"
+    # pdf_obj.status = "done"
     pdf_obj.save()
 
     send_report_email(pdf_id=pdf_obj.id)

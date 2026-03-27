@@ -50,6 +50,14 @@ class Micrografia(models.Model):
     def __str__(self):
         return f"{self.nombre} id: {self.id}"
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["region", "nombre"],
+                name="unique_micrografia_por_region"
+            )
+        ]
+
 class Micrografia_mask(models.Model):
     micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="micrografias_mask")
     nombre = models.CharField(max_length=100)
@@ -106,6 +114,7 @@ class MicrographyMeasure(models.Model):
     mean_size = models.FloatField(blank=True, null=True)
     standard_deviation = models.FloatField(null=True, blank=True)   
     micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="measure_micro")
+    is_valid = models.BooleanField(blank=True, null=True)
 
     def convert_from_px_to_um(self):
         if self.micrografia.um_by_px is None:

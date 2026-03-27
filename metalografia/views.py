@@ -133,6 +133,10 @@ class MicrografiaViewSet(BaseCompanyViewSet):
         # ✅ validar ownership
         if region.muestra.owner != self.get_company():
             raise PermissionDenied("No podés crear micrografías en otra empresa")
+    
+        if 'um_by_px' in serializer.validated_data:
+            del serializer.validated_data['um_by_px']
+
 
         micrografia = serializer.save()
 
@@ -168,7 +172,7 @@ class MicrografiaViewSet(BaseCompanyViewSet):
                         {"error": "um_by_px debe ser numérico"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-
+        print(f"llega: {um_by_px}")
         request._full_data = data  # reemplaza internamente
 
         return super().partial_update(request, *args, **kwargs)
