@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -158,18 +159,17 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-import os
 
 # Carpeta donde se guardarán los archivos subidos
 
 # URL pública para acceder a los archivos subidos
 
 
-CSRF_COOKIE_SAMESITE = 'Lax'
+# CSRF_COOKIE_SAMESITE = 'Lax'
 
-SESSION_COOKIE_SECURE = False
+# SESSION_COOKIE_SECURE = False
 
-CSRF_COOKIE_SECURE = False
+# CSRF_COOKIE_SECURE = False
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
@@ -185,20 +185,18 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CELERY_BROKER_URL = 'redis://localhost:6379/0'
 
 INSTALLED_APPS += ["django_celery_results"]
 
 CELERY_RESULT_BACKEND = "django-db"
 
 # CELERY_BROKER_URL = "redis://redis:6379/0"
-# CELERY_RESULT_BACKEND = "redis://redis:6379/0"
-CELERY_BROKER_URL = "redis://localhost:6379/0"
+# CELERY_BROKER_URL = "redis://localhost:6379/0"
 
 import os
 
 # Ruta absoluta a la carpeta donde están tus imágenes subidas
-MEDIA_ROOT = r"C:\Users\Alber\Documents\IA Metalurgia\Presentación\albertidl\back_copy"
+# MEDIA_ROOT = r"C:\Users\Alber\Documents\IA Metalurgia\Presentación\albertidl\back_copy"
 # MEDIA_URL = '/media/'
 
 REST_FRAMEWORK = {
@@ -218,3 +216,23 @@ EMAIL_USE_TLS = True
 
 EMAIL_HOST_USER = "albertifranco97@gmail.com"
 EMAIL_HOST_PASSWORD = "yfaj cwbu zsqd zazl"
+
+
+import os
+
+# ====================== CELERY + REDIS ======================
+REDIS_URL = os.getenv(
+    'REDIS_URL',
+    'redis://default:mtGKWJ8P9Gp94SmCM29Nf4SjKjQALMe6@redis-15093.c9.us-east-1-4.ec2.cloud.redislabs.com:15093/0'
+)
+CELERY_BROKER_URL = REDIS_URL
+# CELERY_RESULT_BACKEND = REDIS_URL   # Recomendado usar Redis también para resultados
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+# Opcional pero recomendado para Celery en la nube
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
