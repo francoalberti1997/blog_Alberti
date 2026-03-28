@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8000
 
 # Comando por defecto (se puede sobreescribir en Render)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && celery -A albertidl worker --loglevel=info --pool=solo & gunicorn albertidl.wsgi:application --bind 0.0.0.0:\$PORT --workers 2"]
