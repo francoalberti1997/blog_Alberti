@@ -194,19 +194,17 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# ==================== MEDIA FILES ====================
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
 
-# En Render Free (para que no falle en producción)
-if DEBUG:
-    MEDIA_ROOT = BASE_DIR / 'media'
-else:
-    # Carpeta temporal en Render (se borra en cada deploy)
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Ruta consistente dentro del contenedor (recomendado)
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Forzar siempre la misma ruta (evita el if DEBUG)
+if not DEBUG:
+    MEDIA_ROOT = '/app/media'   # Ruta absoluta dentro del contenedor Docker
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-
 
 
 INSTALLED_APPS += ["django_celery_results"]
