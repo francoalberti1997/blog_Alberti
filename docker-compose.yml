@@ -9,16 +9,11 @@ services:
       - .:/app
     ports:
       - "8000:8000"
-    depends_on:
-      - redis
+    # ✅ Ya NO depende de Redis local (usa el de la nube)
     environment:
       - HF_TOKEN=${HF_TOKEN}
-
-  redis:
-    image: redis
-    container_name: redis
-    ports:
-      - "6379:6379"
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}
 
   celery:
     build: .
@@ -26,7 +21,8 @@ services:
     command: celery -A albertidl worker --loglevel=info --pool=solo
     volumes:
       - .:/app
-    depends_on:
-      - redis
+    # ✅ Ya NO depende de Redis local
     environment:
       - HF_TOKEN=${HF_TOKEN}
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}
