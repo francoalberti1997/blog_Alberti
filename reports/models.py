@@ -9,7 +9,7 @@ def generate_code(length=8):
 class ReportPDF(models.Model):
     
     file = models.FileField(
-        upload_to="media/reports/",   
+        upload_to="reports/",   
         blank=True,
         null=True,
         max_length=500                   
