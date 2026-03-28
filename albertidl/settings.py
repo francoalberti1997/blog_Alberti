@@ -36,7 +36,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
     "http://localhost:4321",  # ✅ SIN slash final
     'http://localhost:8000',
-    'alberti-tech.onrender.com', '.onrender.com',
+    'alberti-tech.onrender.com', 
     
 ]
 
@@ -49,7 +49,7 @@ CORS_ALLOWED_ORIGINS  = [
     "http://localhost:4321",  # 
     'http://localhost:8000',
     'alberti-tech.onrender.com', 
-    '.onrender.com',
+    
     
 ]
 
