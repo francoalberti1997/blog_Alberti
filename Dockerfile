@@ -22,4 +22,4 @@ CMD sh -c "python manage.py makemigrations --noinput && \
            python manage.py migrate --noinput && \
            python manage.py collectstatic --noinput && \
            (celery -A albertidl worker --loglevel=info --pool=solo &) && \
-           gunicorn albertidl.wsgi:application --bind 0.0.0.0:\$PORT --workers 2"
+           gunicorn albertidl.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 600"

@@ -3,7 +3,6 @@ import os
 import tempfile
 import numpy as np
 from collections import Counter, defaultdict
-from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 from PIL import Image as PILImage
 from reportlab.platypus import Image
@@ -57,6 +56,8 @@ def create_distribution_plot(values):
                 color="#4682B4", edgecolor="white", alpha=0.82, linewidth=0.8, zorder=3)
 
         if len(values) > 10:
+            from scipy.stats import gaussian_kde
+
             kde = gaussian_kde(values)
             x_range = np.linspace(0, max(1250, values.max() + 150), 600)
             ax.plot(x_range, kde(x_range) * len(values) * 50,
