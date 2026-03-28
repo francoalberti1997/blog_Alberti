@@ -120,5 +120,8 @@ class MicrographyMeasure(models.Model):
         if self.micrografia.um_by_px is None:
             raise ValueError(f"La micrografía {self.micrografia} no tiene definido um_by_px")
         return self.mean_size * self.micrografia.um_by_px, self.standard_deviation * self.micrografia.um_by_px
+
+    def __str__(self):
+        return ((f"micrografia: {self.micrografia.nombre}"))
     
     

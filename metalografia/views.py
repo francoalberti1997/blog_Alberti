@@ -11,7 +11,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -137,13 +137,23 @@ class MicrografiaViewSet(BaseCompanyViewSet):
         if 'um_by_px' in serializer.validated_data:
             del serializer.validated_data['um_by_px']
 
+        # micrografia = serializer.save()
+
+        # chain(
+        #     process_micrografia_mask.s(micrografia.id),
+        #     measure_grain_size.s()
+        # ).apply_async()
 
         micrografia = serializer.save()
 
-        chain(
-            process_micrografia_mask.s(micrografia.id),
-            measure_grain_size.s()
-        ).apply_async()
+        # Ejecutamos la primera tarea y le "linkeamos" la segunda
+        transaction.on_commit(
+            lambda: process_micrografia_mask.apply_async(
+                args=[micrografia.id],
+                countdown=3,                    # 3 segundos de delay ayuda mucho
+                link=measure_grain_size.s()
+            )
+        )
 
     def partial_update(self, request, *args, **kwargs):
         
