@@ -22,7 +22,7 @@ class Muestra(models.Model):
     material = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, related_name="muestras")
     informacion = models.TextField()
     fecha = models.DateTimeField(auto_now_add=True)
-    imagen = models.ImageField(upload_to="media/muestras/")
+    imagen = models.ImageField(upload_to="muestras/")
     categoria = models.ForeignKey("Categoria", on_delete=models.SET_NULL, null=True, blank=True, related_name="muestras")
 
     def __str__(self):
@@ -32,7 +32,7 @@ class Muestra(models.Model):
 class Region(models.Model):
     muestra = models.ForeignKey(Muestra, on_delete=models.CASCADE, related_name="muestra")
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="media/regiones/", blank=True, null=True)
+    imagen = models.ImageField(upload_to="regiones/", blank=True, null=True)
 
     def __str__(self):
         return f"{self.nombre} ({self.muestra.nombre}), id: {self.id}"
@@ -44,7 +44,7 @@ class Region(models.Model):
 class Micrografia(models.Model):
     region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="micrografias")
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="media/micrografias/")
+    imagen = models.ImageField(upload_to="micrografias/")
     um_by_px = models.FloatField(null=True, blank=True) #pixeles por micrómetro
 
     def __str__(self):
@@ -61,7 +61,7 @@ class Micrografia(models.Model):
 class Micrografia_mask(models.Model):
     micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="micrografias_mask")
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="media/micrografias_mask/", blank=True, null=True)
+    imagen = models.ImageField(upload_to="micrografias_mask/", blank=True, null=True)
     status = models.CharField(max_length=50, default="pending")
 
     def __str__(self):
