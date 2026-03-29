@@ -302,6 +302,6 @@ def generate_microstructural_report_pdf(pdf_id: int):
     pdf_obj.file.save(filename, ContentFile(pdf_bytes), save=False)
     # pdf_obj.status = "done"
     pdf_obj.save()
-    print("Enviando reporte")
+    print("Enviando reporte al server remoto")
     send_report_email(pdf_id=pdf_obj.id)
     return 1

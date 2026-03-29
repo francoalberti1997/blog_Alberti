@@ -1,8 +1,10 @@
 from django.core.mail import EmailMessage
 from django.conf import settings
 import os
+import requests  # 👈 agregamos esto
 from ..models import ReportPDF
 
+SERVER_MAIL = "https://superdeclamatory-claris-prolongably.ngrok-free.dev/send/"  # 👈 URL del otro server
 
 def send_report_email(pdf_id: int):
     pdf_obj = ReportPDF.objects.select_related('owner').get(id=pdf_id)
@@ -24,33 +26,39 @@ def send_report_email(pdf_id: int):
     Franco Alberti
 
     """
-    email = EmailMessage(
-        subject,
-        body,
-        settings.DEFAULT_FROM_EMAIL,
-        [pdf_obj.owner.user.email],
-    )
 
-    # adjuntar PDF
     pdf_path = pdf_obj.file.path
-    if os.path.exists(pdf_path):
-        with open(pdf_path, 'rb') as f:
-            email.attach(os.path.basename(pdf_path), f.read(), 'application/pdf')
 
     try:
-        print("Enviando Mail")
-        result = email.send()
+        print("Enviando Mail (via servicio externo)")
 
-        if result == 1:
-            pdf_obj.status = "done"
-            pdf_obj.save(update_fields=["status"])
-            return 1
+        if os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as f:
+                response = requests.post(
+                    SERVER_MAIL,  # 👈 URL del otro server
+                    data={
+                        "subject": subject,
+                        "body": body,
+                        "to": pdf_obj.owner.user.email,
+                    },
+                    files={
+                        "file": (os.path.basename(pdf_path), f, "application/pdf")
+                    },
+                    timeout=10
+                )
+
+            if response.status_code == 200:
+                pdf_obj.status = "done"
+                pdf_obj.save(update_fields=["status"])
+                return 1
+
+            print(f"Error response: {response.status_code} - {response.text}")
+            return 0
 
         return 0
 
     except Exception as e:
         pdf_obj.status = "error"
         pdf_obj.save(update_fields=["status"])
-        # opcional: loggear error
         print(f"Error enviando email: {e}")
-        return 0    
+        return 0
