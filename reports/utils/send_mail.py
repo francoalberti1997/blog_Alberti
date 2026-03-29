@@ -4,7 +4,7 @@ import os
 import requests  # 👈 agregamos esto
 from ..models import ReportPDF
 
-SERVER_MAIL = "https://superdeclamatory-claris-prolongably.ngrok-free.dev/send/"  # 👈 URL del otro server
+SERVER_MAIL = "https://francoalberti97.pythonanywhere.com/send/"  # 👈 URL del otro server
 
 def send_report_email(pdf_id: int):
     pdf_obj = ReportPDF.objects.select_related('owner').get(id=pdf_id)
