@@ -1,3 +1,6 @@
+from django.core.mail import EmailMessage
+import os
+
 from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,6 +17,12 @@ from .models import ReportPDF
 from .serializers import ReportPDFSerializer
 from rest_framework import status
 from django.db import models
+from rest_framework.authentication import TokenAuthentication
+
+from rest_framework.permissions import IsAuthenticated
+from django.conf import settings
+from reports.utils.send_mail import send_report_email
+
 
 class GeneratePDF(APIView):
     permission_classes = [IsAuthenticated]
@@ -116,3 +125,67 @@ class TrackPDF(APIView):
         
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+"""
+MAIL. DESDE PYTHON ANYWHERE. SE ENVÍA POR UN LLAMADO DESDE RENDER.
+"""
+class SendReportPDFByEmail(APIView):
+    """
+    Endpoint para enviar un ReportPDF por email.
+    Solo requiere el código del reporte. El destinatario se obtiene automáticamente.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        codigo_objeto = request.data.get('codigo')
+
+        if not codigo_objeto:
+            return Response({
+                "error": "El campo 'codigo' es obligatorio."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Buscar el reporte por su código (value)
+        try:
+            report = ReportPDF.objects.select_related('owner', 'owner__user').get(
+                value=codigo_objeto
+            )
+        except ReportPDF.DoesNotExist:
+            return Response({
+                "error": "No se encontró ningún reporte con el código proporcionado."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Verificar que el usuario autenticado sea el propietario
+        if not report.owner or report.owner.user != request.user:
+            return Response({
+                "error": "No tienes permiso para enviar este reporte. Solo el propietario puede hacerlo."
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Verificar que el archivo PDF exista
+        if not report.file or not report.file.path or not os.path.exists(report.file.path):
+            return Response({
+                "error": "El archivo PDF no está disponible en el servidor."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            # Llamar a la función que envía el email
+            resultado = send_report_email(report.id)
+
+            if resultado == 1:
+                return Response({
+                    "success": True,
+                    "message": f"Reporte enviado correctamente a {report.owner.user.email}",
+                    "codigo": codigo_objeto,
+                    "destinatario": report.owner.user.email
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": "No se pudo enviar el correo electrónico."
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            return Response({
+                "error": "Error al enviar el correo electrónico.",
+                "detail": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

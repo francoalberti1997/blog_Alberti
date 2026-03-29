@@ -22,7 +22,7 @@ services:
     volumes:
       - .:/app
     # ✅ Ya NO depende de Redis local
-    environment:
+    environment:  
       - HF_TOKEN=${HF_TOKEN}
       - REDIS_URL=${REDIS_URL}
       - DATABASE_URL=${DATABASE_URL}
