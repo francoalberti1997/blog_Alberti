@@ -38,8 +38,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://alberti-tech.onrender.com',
     'https://alberti-tech.onrender.com', 
-
-    
     
 ]
 
