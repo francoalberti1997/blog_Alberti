@@ -6,5 +6,4 @@ urlpatterns = [
     path("pdf/", GeneratePDF.as_view(), name="generate_pdf"),
     path("", TrackPDF.as_view(), name="check_pdf"),
     path("<int:id>/", TrackPDF.as_view(), name="check_pdf"),
-    path('send-report-pdf/', SendReportPDFByEmail.as_view(), name='send-report-pdf'),    
 ]
