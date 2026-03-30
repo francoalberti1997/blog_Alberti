@@ -16,7 +16,7 @@ import traceback
 from reports.utils.send_mail import send_report_email
 
 
-BASE_PREDICT_URL = "https://francoalb-magnesia.hf.space/segment/45956/"
+BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/45956/"
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
