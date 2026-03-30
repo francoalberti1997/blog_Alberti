@@ -38,6 +38,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://alberti-tech.onrender.com',
     'https://alberti-tech.onrender.com', 
+    "https://francoalberti97.pythonanywhere.com/",    
     
 ]
 
@@ -51,7 +52,7 @@ CORS_ALLOWED_ORIGINS  = [
     'http://localhost:8000',
     'http://alberti-tech.onrender.com', 
     'https://alberti-tech.onrender.com', 
-    
+    "https://francoalberti97.pythonanywhere.com/",
 ]
 
 # settings.py
