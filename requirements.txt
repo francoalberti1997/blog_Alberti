@@ -33,3 +33,5 @@ gunicorn>=22.0.0
 
 python-dotenv
 
+cloudinary==1.33.0
+
