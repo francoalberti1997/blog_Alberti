@@ -7,6 +7,9 @@ import os
 import random
 import csv
 from pathlib import Path
+import requests
+import numpy as np
+import cv2
 
 sys.path.append(
     os.path.abspath(
@@ -72,10 +75,25 @@ def generar_grilla_intercepciones_constantes(
 
     # edge = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
 
-    edge = cv2.imdecode(
-    np.fromfile(mask_file, dtype=np.uint8),
-    cv2.IMREAD_GRAYSCALE
-)
+    # edge = cv2.imdecode(
+    #     np.fromfile(mask_file, dtype=np.uint8),
+    #     cv2.IMREAD_GRAYSCALE
+    # )
+    
+    print(f"Intentando leer máscara desde archivo: {mask_file}")
+    
+    mask_url = mask_file.url
+
+    response = requests.get(mask_url)
+
+    print(f"Respuesta HTTP: {response.status_code} para URL: {mask_url}")
+
+    response.raise_for_status()
+
+    mask_array = np.frombuffer(response.content, np.uint8)
+
+    edge = cv2.imdecode(mask_array, cv2.IMREAD_GRAYSCALE)
+    print(f"Leída máscara desde URL: {mask_url}")
 
     if edge is None:
         raise FileNotFoundError(f"No se pudo leer la máscara: {mask_file}")
@@ -98,20 +116,24 @@ def generar_grilla_intercepciones_constantes(
     # ─── Calibración µm/px ───────────────────────────────────────────────
     print("Calibrando factor µm/px...")
     try:
-        img = plt.imread(img_file)
-        # um_per_pix = marcar_recta(img)
-        # um_per_pix = 2.0853
-    
+        print(f"Descargando imagen original para calibración...")
+
+        img_url = img_file.url if hasattr(img_file, "url") else img_file
+
+        response = requests.get(img_url)
+        response.raise_for_status()
+
+        img_array = np.frombuffer(response.content, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
+
+        if img is None:
+            raise ValueError("No se pudo decodificar la imagen original")
+
+        print("Imagen original cargada correctamente")
 
     except Exception as e:
         print(f"Error en calibración: {e}")
-        # um_per_pix = None
-
-    # if um_per_pix is None or um_per_pix <= 0:
-    #     raise ValueError("No se obtuvo calibración válida (µm/px).")
-
-    # print(f"→ {um_per_pix:.4f} µm/px")
-    # min_intercept_px = min_intercept_um / um_per_pix
+ 
 
     # ─── Longitud fija conservadora ──────────────────────────────────────
     fixed_length_px = min(W, H) - 2 * safety_margin_px - 60

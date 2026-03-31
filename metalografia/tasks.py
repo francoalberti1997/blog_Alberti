@@ -16,59 +16,78 @@ import traceback
 from reports.utils.send_mail import send_report_email
 
 
-BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/45956/"
+BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/"
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
+import cloudinary.uploader
+from celery import shared_task
+from django.core.files.base import ContentFile  # ya no es necesario, pero lo dejamos por si acaso
+
 @shared_task
 def process_micrografia_mask(mask_id):
-
     micrografia = Micrografia.objects.get(id=mask_id)
 
     mask = Micrografia_mask.objects.create(
-        micrografia = micrografia,
-        nombre = micrografia.nombre + "_mask"
+        micrografia=micrografia,
+        nombre=micrografia.nombre + "_mask",
+        status="processing"
     )
 
     try:
+        print("Descargando imagen desde Cloudinary...")
+        image_url = micrografia.imagen.url
 
-        with micrografia.imagen.open("rb") as img_file:
+        img_response = requests.get(image_url, timeout=15)
+        img_response.raise_for_status()
+        print("Imagen descargada OK")
 
-            headers = {
-                "Authorization": f"Bearer {HF_TOKEN}"
-            }
+        headers = {
+            "Authorization": f"Bearer {os.getenv('HF_TOKEN')}"
+        }
 
-            response = requests.post(
-                BASE_PREDICT_URL,
-                headers=headers,
-                files={"file": img_file}
-            )
-    
+        print("Enviando imagen a Hugging Face...")
+        response = requests.post(
+            BASE_PREDICT_URL + micrografia.region.muestra.material.code + "/",  # endpoint dinámico por material
+            headers=headers,
+            files={
+                "file": ("image.png", img_response.content, "image/png")
+            },
+            timeout=30
+        )
 
+        print("STATUS HF:", response.status_code)
         response.raise_for_status()
 
-        result = response.content  
+        result = response.content  # bytes de la máscara
 
-        mask.imagen.save(
-            f"mask_{micrografia.id}.png",
-            ContentFile(result),
-            save=False
+        # ====================== SUBIDA A CLOUDINARY ======================
+        print("Subiendo máscara a Cloudinary...")
+
+        upload_result = cloudinary.uploader.upload(
+            result,                                   # acepta bytes directamente
+            folder="masks",                           # carpeta opcional
+            public_id=f"mask_{micrografia.id}",       # nombre único
+            overwrite=True,
+            resource_type="image"
         )
+
+        # Asignamos la URL segura que devuelve Cloudinary
+        mask.imagen = upload_result['secure_url']     # o upload_result['public_id'] según tu config
 
         mask.status = "done"
         mask.save()
 
-        
+        print(f"Máscara generada OK → micrografia {micrografia.id} | URL: {mask.imagen}")
 
     except Exception as e:
-
+        print("ERROR en process_micrografia_mask:", str(e))
+        
         mask.status = "error"
-        mask.save()
+        mask.save(update_fields=['status'])
+        raise
 
-        raise e
-    
     print(f"Retornando id de micrografia: {micrografia.id}")
-
     return micrografia.id
 
 @shared_task()
@@ -85,7 +104,7 @@ def measure_grain_size(micrografia):
     if not micrografia.imagen:
         raise ValueError(f"La micrografía {micrografia} no tiene imagen cargada")
 
-    img_file = micrografia.imagen.path
+    img_file = micrografia.imagen.url
 
     # 2. Máscara (OneToOne)
     if not hasattr(micrografia, 'micrografias_mask'):
@@ -155,7 +174,7 @@ def generate_microstructural_report_pdf(pdf_id: int):
     # === Datos básicos ===
     operador_nombre = f"{pdf_obj.owner.name} {pdf_obj.owner.surname}"
     institucion = pdf_obj.owner.company.name if pdf_obj.owner.company else ""
-    logo_url = pdf_obj.owner.company.image.path if pdf_obj.owner.company and pdf_obj.owner.company.image else None
+    logo_url = pdf_obj.owner.company.image.url if pdf_obj.owner.company and pdf_obj.owner.company.image else None
 
     from datetime import datetime
     now = datetime.now()
@@ -177,7 +196,7 @@ def generate_microstructural_report_pdf(pdf_id: int):
                     print(f"No será tenida en cuenta la micrografía: {micro.nombre}")
                     invalid_micrographs.append({
                         "nombre": micro.nombre,
-                    "path": micro.imagen.path if micro.imagen else None,
+                    "path": micro.imagen.url if micro.imagen else None,
                     })
                     
                     continue
@@ -228,13 +247,60 @@ def generate_microstructural_report_pdf(pdf_id: int):
     dist_plot_path = create_distribution_plot(values)
 
     # === Preparar datos de regiones + imágenes ===
+    # regions_data = []
+
+    # for region in Region.objects.filter(muestra=muestra):
+    #     reg_dict = {
+    #         'nombre': region.nombre,
+    #         'titulo': f"Región: {region.nombre}",
+    #         'imagen_path': region.imagen.url if region.imagen else None,
+    #         'calidades': []
+    #     }
+
+    #     # Tamaño medio de la región
+    #     try:
+    #         if hasattr(region, 'region_measure') and region.region_measure.mean_size is not None:
+    #             reg_dict['titulo'] += f" – Tamaño medio: {region.region_measure.mean_size:.1f} µm"
+    #     except:
+    #         pass
+
+    #     # Agrupar micrografías de esta región por calidad
+    #     region_grains = [g for g in grain_data if g['region'].id == region.id]
+    #     region_by_cal = defaultdict(list)
+    #     for g in region_grains:
+    #         region_by_cal[g['calidad']['id']].append(g)
+
+    #     for cal_id in sorted(region_by_cal.keys()):
+    #         cal = next(c for c in CALIDADES_FIJAS if c["id"] == cal_id)
+
+    #         cal_block = {
+    #             'id': cal_id,
+    #             'label': cal['label'],
+    #             'figuras': []
+    #         }
+
+    #         for grain in region_by_cal[cal_id]:
+    #             micro = grain['micro']
+    #             if micro.imagen and os.path.exists(micro.imagen.url):
+    #                 cal_block['figuras'].append({
+    #                     'path': micro.imagen.url,
+    #                     'caption': f"{micro.nombre} – {cal['label']} – Región {region.nombre}"
+    #                 })
+
+    #         if cal_block['figuras']:
+    #             reg_dict['calidades'].append(cal_block)
+
+    #     regions_data.append(reg_dict)
+
+    from collections import defaultdict
+
     regions_data = []
 
     for region in Region.objects.filter(muestra=muestra):
         reg_dict = {
             'nombre': region.nombre,
             'titulo': f"Región: {region.nombre}",
-            'imagen_path': region.imagen.path if region.imagen and os.path.exists(region.imagen.path) else None,
+            'imagen_path': getattr(region.imagen, 'url', None) if region.imagen else None,
             'calidades': []
         }
 
@@ -252,7 +318,9 @@ def generate_microstructural_report_pdf(pdf_id: int):
             region_by_cal[g['calidad']['id']].append(g)
 
         for cal_id in sorted(region_by_cal.keys()):
-            cal = next(c for c in CALIDADES_FIJAS if c["id"] == cal_id)
+            cal = next((c for c in CALIDADES_FIJAS if c["id"] == cal_id), None)
+            if not cal:
+                continue
 
             cal_block = {
                 'id': cal_id,
@@ -262,16 +330,28 @@ def generate_microstructural_report_pdf(pdf_id: int):
 
             for grain in region_by_cal[cal_id]:
                 micro = grain['micro']
-                if micro.imagen and os.path.exists(micro.imagen.path):
+                
+                # ✅ CORRECCIÓN: NO usar os.path.exists() con Cloudinary
+                image_url = getattr(micro.imagen, 'url', None) if micro.imagen else None
+                
+                if image_url:
                     cal_block['figuras'].append({
-                        'path': micro.imagen.path,
+                        'path': image_url,   # URL de Cloudinary
                         'caption': f"{micro.nombre} – {cal['label']} – Región {region.nombre}"
                     })
 
+            # Solo agregar el bloque de calidad si tiene al menos una figura
             if cal_block['figuras']:
                 reg_dict['calidades'].append(cal_block)
 
         regions_data.append(reg_dict)
+
+    # Debug: ver qué se está generando
+    print(f"Regiones generadas: {len(regions_data)}")
+    for r in regions_data:
+        print(f"  - {r['nombre']}: {len(r['calidades'])} calidades")
+        for c in r['calidades']:
+            print(f"    → Calidad {c['id']}: {len(c['figuras'])} figuras")
 
     # === Diccionario para el PDF ===
     data = {
@@ -290,7 +370,8 @@ def generate_microstructural_report_pdf(pdf_id: int):
         'n_calidades': n_calidades_encontradas,
         'calidad_table_data': calidad_table_data,
         'dist_plot_path': dist_plot_path,
-        'muestra_imagen_path': muestra.imagen.path if getattr(muestra, 'imagen', None) and os.path.exists(muestra.imagen.path) else None,
+        # 'muestra_imagen_path': muestra.imagen.url if getattr(muestra, 'imagen', None) and os.path.exists(muestra.imagen.url) else None,
+        'muestra_imagen_path': muestra.imagen.url if hasattr(muestra.imagen, 'url') else None,        
         'regions': regions_data,
         "logo_url": logo_url,
         "invalid_micrographs": invalid_micrographs

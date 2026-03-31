@@ -220,12 +220,31 @@ def build_pdf_content(data: dict) -> tuple[bytes, str]:
     elements.append(Spacer(1, 1.6*cm))
 
     # IMAGEN GENERAL DE LA MUESTRA
-    if muestra_imagen_path and os.path.exists(muestra_imagen_path):
+    # if muestra_imagen_path and os.path.exists(muestra_imagen_path):
+    #     elements.append(KeepTogether([
+    #         image_keep_aspect(muestra_imagen_path, 16.5, 11),
+    #         Paragraph("Figura 1. Aspecto general de la muestra.", caption)
+    #     ]))
+    #     elements.append(Spacer(1, 1.5*cm))
+    
+    final_path = None
+
+    if muestra_imagen_path:
+        if str(muestra_imagen_path).startswith("http"):
+            resp = requests.get(muestra_imagen_path, timeout=10)
+            resp.raise_for_status()
+
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                f.write(resp.content)
+                final_path = f.name
+        else:
+            final_path = muestra_imagen_path
+
+    if final_path and os.path.exists(final_path):
         elements.append(KeepTogether([
-            image_keep_aspect(muestra_imagen_path, 16.5, 11),
+            image_keep_aspect(final_path, 16.5, 11),
             Paragraph("Figura 1. Aspecto general de la muestra.", caption)
         ]))
-        elements.append(Spacer(1, 1.5*cm))
 
     # GRÁFICO DE DISTRIBUCIÓN
     if dist_plot_path and os.path.exists(dist_plot_path):
@@ -240,44 +259,286 @@ def build_pdf_content(data: dict) -> tuple[bytes, str]:
         elements.append(Spacer(1, 1.2*cm))
 
     # SECCIÓN DE REGIONES
+    # fig_num = 3
+    # for region_data in regions:
+    #     region_block = []
+    #     region_block.append(Paragraph(region_data['titulo'], h1))
+    #     region_block.append(Spacer(1, 1.0*cm))
+
+    #     if region_data.get('imagen_path') and os.path.exists(region_data['imagen_path']):
+    #         region_block.append(KeepTogether([
+    #             image_keep_aspect(region_data['imagen_path'], 15.5, 10.2),
+    #             Spacer(1, 0.5*cm),
+    #             Paragraph(f"Figura {fig_num}. Región {region_data['nombre']} – Vista general.", caption),
+    #             Spacer(1, 1.4*cm),
+    #         ]))
+    #         fig_num += 1
+
+    # for region_data in regions:
+    #     region_block = []
+    #     region_block.append(Paragraph(region_data['titulo'], h1))
+    #     region_block.append(Spacer(1, 1.0*cm))
+
+    #     # === IMAGEN GENERAL DE LA REGIÓN (solo esta parte por ahora) ===
+    #     imagen_path = region_data.get('imagen_path')
+
+    #     print(f"Procesando imagen de región '{region_data['nombre']}': {imagen_path}")
+        
+    #     if imagen_path:
+    #         final_path = None
+
+    #         if str(imagen_path).startswith("http"):
+    #             try:
+    #                 resp = requests.get(imagen_path, timeout=15)
+    #                 resp.raise_for_status()
+
+    #                 print(f"Imagen de región '{region_data['nombre']}' descargada exitosamente desde URL.")
+
+    #                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+    #                     f.write(resp.content)
+    #                     final_path = f.name
+    #                     print(f"Imagen región descargada temporalmente: {final_path}")
+    #             except Exception as e:
+    #                 print(f"Error descargando imagen de región {region_data.get('nombre')}: {e}")
+    #                 final_path = None
+    #         else:
+    #             final_path = imagen_path
+
+    #         # Agregar la imagen si se pudo obtener el path final
+    #         if final_path and os.path.exists(final_path):
+    #             print(f"Agregando imagen de región '{region_data['nombre']}' al PDF desde: {final_path}")
+    #             region_block.append(KeepTogether([
+    #                 image_keep_aspect(final_path, 15.5, 10.2),
+    #                 Spacer(1, 0.5*cm),
+    #                 Paragraph(f"Figura {fig_num}. Región {region_data['nombre']} – Vista general.", caption),
+    #                 Spacer(1, 1.4*cm),
+    #             ]))
+    #             fig_num += 1
+    #         else:
+    #             # Fallback si no se pudo cargar la imagen
+    #             region_block.append(Paragraph(
+    #                 f"Figura {fig_num}. Región {region_data['nombre']} – [Imagen no disponible]", 
+    #                 caption
+    #             ))
+    #             fig_num += 1
+    #     # print("region_data['calidades']:", region_data['calidades'])
+    #     # for cal_block in region_data['calidades']:
+    #     #     print(f"Procesando bloque de calidad '{cal_block['label']}' en región '{region_data['nombre']}' con {len(cal_block['figuras'])} figuras.")
+    #     #     calidad_subblock = []
+    #     #     calidad_subblock.append(Paragraph(cal_block['label'], h1 if cal_block['id'] <= 4 else h2))
+    #     #     calidad_subblock.append(Spacer(1, 0.6*cm))
+
+    #     #     for fig_data in cal_block['figuras']:
+    #     #         print(f"Procesando figura '{fig_data['caption']}' en calidad '{cal_block['label']}'")
+    
+    #     #         calidad_subblock.append(KeepTogether([
+    #     #             image_keep_aspect(fig_data['path'], 13.0, 9.3),
+    #     #             Spacer(1, 0.45*cm),
+    #     #             Paragraph(
+    #     #                 f"Figura {fig_num}. {fig_data['caption']}",
+    #     #                 caption
+    #     #             ),
+    #     #             Spacer(1, 1.1*cm),
+    #     #         ]))
+    #     #         fig_num += 1
+
+    #     #     region_block.append(KeepTogether(calidad_subblock))
+
+    #     # region_block.append(Spacer(1, 2.0*cm))
+    #     # elements.append(KeepTogether(region_block))
+    
+    #         # === PROCESAMIENTO DE CALIDADES Y FIGURAS ===
+    #     for cal_block in region_data['calidades']:
+    #         print(f"Procesando bloque de calidad '{cal_block['label']}' en región '{region_data['nombre']}' con {len(cal_block['figuras'])} figuras.")
+
+    #         calidad_subblock = []
+    #         calidad_subblock.append(Paragraph(cal_block['label'], 
+    #                                         h1 if cal_block['id'] <= 4 else h2))
+    #         calidad_subblock.append(Spacer(1, 0.6*cm))
+
+    #         for fig_data in cal_block['figuras']:
+    #             print(f"Procesando figura: {fig_data.get('caption')}")
+
+    #             fig_path = fig_data.get('path')
+    #             final_fig_path = None
+
+    #             if fig_path and str(fig_path).startswith(("http", "https")):
+    #                 try:
+    #                     print(f"Descargando figura desde URL...")
+    #                     resp = requests.get(fig_path, timeout=20)
+    #                     resp.raise_for_status()
+
+    #                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+    #                         f.write(resp.content)
+    #                         final_fig_path = f.name
+    #                     print(f"✓ Figura descargada temporalmente: {final_fig_path}")
+    #                 except Exception as e:
+    #                     print(f"✗ Error descargando figura: {e}")
+    #                     final_fig_path = None
+    #             else:
+    #                 final_fig_path = fig_path
+
+    #             # Agregar al PDF
+    #             if final_fig_path and os.path.exists(final_fig_path):
+    #                 calidad_subblock.append(KeepTogether([
+    #                     image_keep_aspect(final_fig_path, 13.0, 9.3),
+    #                     Spacer(1, 0.45*cm),
+    #                     Paragraph(
+    #                         f"Figura {fig_num}. {fig_data['caption']}",
+    #                         caption
+    #                     ),
+    #                     Spacer(1, 1.1*cm),
+    #                 ]))
+    #                 fig_num += 1
+    #             else:
+    #                 calidad_subblock.append(KeepTogether([
+    #                     Paragraph(
+    #                         f"Figura {fig_num}. {fig_data.get('caption', 'Sin nombre')} – [Imagen no disponible]", 
+    #                         caption
+    #                     ),
+    #                     Spacer(1, 0.8*cm)
+    #                 ]))
+    #                 fig_num += 1
+
+    #         # Agregar el bloque de calidad completo
+    #         region_block.append(KeepTogether(calidad_subblock))
+
+        # SECCIÓN DE REGIONES
     fig_num = 3
     for region_data in regions:
         region_block = []
         region_block.append(Paragraph(region_data['titulo'], h1))
         region_block.append(Spacer(1, 1.0*cm))
 
-        if region_data.get('imagen_path') and os.path.exists(region_data['imagen_path']):
-            region_block.append(KeepTogether([
-                image_keep_aspect(region_data['imagen_path'], 15.5, 10.2),
-                Spacer(1, 0.5*cm),
-                Paragraph(f"Figura {fig_num}. Región {region_data['nombre']} – Vista general.", caption),
-                Spacer(1, 1.4*cm),
-            ]))
-            fig_num += 1
+        print(f"Procesando imagen de región '{region_data['nombre']}': {region_data.get('imagen_path')}")
 
+        # === IMAGEN GENERAL DE LA REGIÓN ===
+        imagen_path = region_data.get('imagen_path')
+        if imagen_path:
+            final_path = None
+
+            if str(imagen_path).startswith(("http", "https")):
+                try:
+                    resp = requests.get(imagen_path, timeout=15)
+                    resp.raise_for_status()
+
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                        f.write(resp.content)
+                        final_path = f.name
+                    print(f"Imagen región '{region_data['nombre']}' descargada temporalmente: {final_path}")
+                except Exception as e:
+                    print(f"Error descargando imagen de región {region_data['nombre']}: {e}")
+                    final_path = None
+            else:
+                final_path = imagen_path
+
+            if final_path and os.path.exists(final_path):
+                region_block.append(KeepTogether([
+                    image_keep_aspect(final_path, 15.5, 10.2),
+                    Spacer(1, 0.5*cm),
+                    Paragraph(f"Figura {fig_num}. Región {region_data['nombre']} – Vista general.", caption),
+                    Spacer(1, 1.4*cm),
+                ]))
+                fig_num += 1
+            else:
+                region_block.append(Paragraph(
+                    f"Figura {fig_num}. Región {region_data['nombre']} – [Imagen no disponible]", 
+                    caption
+                ))
+                fig_num += 1
+
+        # === CALIDADES Y FIGURAS ===
         for cal_block in region_data['calidades']:
+            print(f"Procesando bloque de calidad '{cal_block['label']}' en región '{region_data['nombre']}' con {len(cal_block['figuras'])} figuras.")
+
             calidad_subblock = []
-            calidad_subblock.append(Paragraph(cal_block['label'], h1 if cal_block['id'] <= 4 else h2))
+            calidad_subblock.append(Paragraph(cal_block['label'], 
+                                            h1 if cal_block['id'] <= 4 else h2))
             calidad_subblock.append(Spacer(1, 0.6*cm))
 
             for fig_data in cal_block['figuras']:
-                calidad_subblock.append(KeepTogether([
-                    image_keep_aspect(fig_data['path'], 13.0, 9.3),
-                    Spacer(1, 0.45*cm),
-                    Paragraph(
-                        f"Figura {fig_num}. {fig_data['caption']}",
-                        caption
-                    ),
-                    Spacer(1, 1.1*cm),
-                ]))
-                fig_num += 1
+                print(f"Procesando figura: {fig_data.get('caption')}")
+
+                fig_path = fig_data.get('path')
+                final_fig_path = None
+
+                if fig_path and str(fig_path).startswith(("http", "https")):
+                    try:
+                        resp = requests.get(fig_path, timeout=20)
+                        resp.raise_for_status()
+
+                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                            f.write(resp.content)
+                            final_fig_path = f.name
+                        print(f"✓ Figura descargada temporalmente: {final_fig_path}")
+                    except Exception as e:
+                        print(f"✗ Error descargando figura: {e}")
+                        final_fig_path = None
+                else:
+                    final_fig_path = fig_path
+
+                if final_fig_path and os.path.exists(final_fig_path):
+                    calidad_subblock.append(KeepTogether([
+                        image_keep_aspect(final_fig_path, 13.0, 9.3),
+                        Spacer(1, 0.45*cm),
+                        Paragraph(
+                            f"Figura {fig_num}. {fig_data['caption']}",
+                            caption
+                        ),
+                        Spacer(1, 1.1*cm),
+                    ]))
+                    fig_num += 1
+                else:
+                    calidad_subblock.append(KeepTogether([
+                        Paragraph(
+                            f"Figura {fig_num}. {fig_data.get('caption', 'Sin nombre')} – [Imagen no disponible]", 
+                            caption
+                        ),
+                        Spacer(1, 0.8*cm)
+                    ]))
+                    fig_num += 1
 
             region_block.append(KeepTogether(calidad_subblock))
 
+        # === AGREGAR LA REGIÓN COMPLETA AL PDF ===
         region_block.append(Spacer(1, 2.0*cm))
         elements.append(KeepTogether(region_block))
+        print(f"✓ Región '{region_data['nombre']}' agregada al PDF")
+
 
     # MICROGRAFÍAS NO PROCESADAS
+    # if invalid_micrographs:
+    #     elements.append(PageBreak())
+
+    #     elements.append(Paragraph("Micrografías no procesadas", h1))
+    #     elements.append(Spacer(1, 0.8*cm))
+
+    #     elements.append(Paragraph(
+    #         "Las siguientes micrografías no pudieron ser analizadas automáticamente "
+    #         "debido a problemas en la detección de bordes de cristal. No fueron consideradas en los cálculos.",
+    #         normal
+    #     ))
+    #     elements.append(Spacer(1, 1.2*cm))
+
+    #     for micro in invalid_micrographs:
+    #         block = []
+
+    #         # Imagen
+    #         if micro.get("path"):
+    #             block.append(KeepTogether([
+    #                 image_keep_aspect(micro["path"], 13.0, 9.3),
+    #                 Spacer(1, 0.4*cm),
+    #                 Paragraph(
+    #                     f"{micro.get('nombre', 'Micrografía sin nombre')}",
+    #                     caption
+    #                 ),
+    #                 Spacer(1, 1.0*cm)
+    #             ]))
+           
+
+    #         elements.append(KeepTogether(block))
+
+        # MICROGRAFÍAS NO PROCESADAS
     if invalid_micrographs:
         elements.append(PageBreak())
 
@@ -286,26 +547,48 @@ def build_pdf_content(data: dict) -> tuple[bytes, str]:
 
         elements.append(Paragraph(
             "Las siguientes micrografías no pudieron ser analizadas automáticamente "
-            "debido a problemas en la detección de bordes de cristal. No fueron consideradas en los cálculos.",
+            "debido a problemas en la detección de bordes de cristal. "
+            "No fueron consideradas en los cálculos estadísticos.",
             normal
         ))
         elements.append(Spacer(1, 1.2*cm))
 
         for micro in invalid_micrographs:
             block = []
+            micro_name = micro.get('nombre', 'Micrografía sin nombre')
+            image_url = micro.get("path") or micro.get("imagen_url") or micro.get("image_url")
 
-            # Imagen
-            if micro.get("path") and os.path.exists(micro["path"]):
+            print(f"Procesando micrografía inválida: {micro_name} | URL: {image_url}")
+
+            final_micro_path = None
+
+            if image_url and str(image_url).startswith(("http", "https")):
+                try:
+                    resp = requests.get(image_url, timeout=15)
+                    resp.raise_for_status()
+
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                        f.write(resp.content)
+                        final_micro_path = f.name
+                    print(f"✓ Micro inválida descargada: {final_micro_path}")
+                except Exception as e:
+                    print(f"✗ Error descargando micro inválida {micro_name}: {e}")
+                    final_micro_path = None
+            else:
+                final_micro_path = image_url
+
+            if final_micro_path and os.path.exists(final_micro_path):
                 block.append(KeepTogether([
-                    image_keep_aspect(micro["path"], 13.0, 9.3),
+                    image_keep_aspect(final_micro_path, 13.0, 9.3),
                     Spacer(1, 0.4*cm),
-                    Paragraph(
-                        f"{micro.get('nombre', 'Micrografía sin nombre')}",
-                        caption
-                    ),
+                    Paragraph(micro_name, caption),
                     Spacer(1, 1.0*cm)
                 ]))
-           
+            else:
+                block.append(KeepTogether([
+                    Paragraph(f"{micro_name} – [Imagen no disponible]", caption),
+                    Spacer(1, 1.0*cm)
+                ]))
 
             elements.append(KeepTogether(block))
 

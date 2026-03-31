@@ -1,6 +1,7 @@
 from django.db import models
 import numpy as np
 from member.models import Member, Company
+from cloudinary.models import CloudinaryField
 
 class Categoria(models.Model):
     nombre = models.CharField(max_length=100)
@@ -22,17 +23,18 @@ class Muestra(models.Model):
     material = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, related_name="muestras")
     informacion = models.TextField()
     fecha = models.DateTimeField(auto_now_add=True)
-    imagen = models.ImageField(upload_to="muestras/")
+    # imagen = models.ImageField(upload_to="muestras/")
+    imagen = CloudinaryField('image')
+
     categoria = models.ForeignKey("Categoria", on_delete=models.SET_NULL, null=True, blank=True, related_name="muestras")
 
     def __str__(self):
         return self.nombre + f" self.id: {self.id}"
 
-
 class Region(models.Model):
     muestra = models.ForeignKey(Muestra, on_delete=models.CASCADE, related_name="muestra")
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="regiones/", blank=True, null=True)
+    imagen = CloudinaryField('image')
 
     def __str__(self):
         return f"{self.nombre} ({self.muestra.nombre}), id: {self.id}"
@@ -44,7 +46,7 @@ class Region(models.Model):
 class Micrografia(models.Model):
     region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name="micrografias")
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="micrografias/")
+    imagen = CloudinaryField('image')
     um_by_px = models.FloatField(null=True, blank=True) #pixeles por micrómetro
 
     def __str__(self):
@@ -59,9 +61,9 @@ class Micrografia(models.Model):
         ]
 
 class Micrografia_mask(models.Model):
-    micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="micrografias_mask")
+    micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="micrografias_mask", blank=True, null=True)
     nombre = models.CharField(max_length=100)
-    imagen = models.ImageField(upload_to="micrografias_mask/", blank=True, null=True)
+    imagen = CloudinaryField('image')
     status = models.CharField(max_length=50, default="pending")
 
     def __str__(self):
@@ -124,4 +126,15 @@ class MicrographyMeasure(models.Model):
     def __str__(self):
         return ((f"micrografia: {self.micrografia.nombre}"))
     
-    
+
+class MultiMicrografia_mask(models.Model):
+    micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, blank=True, null=True)
+    nombre = models.CharField(max_length=100)
+    imagen = CloudinaryField('image')
+    status = models.CharField(max_length=50, default="pending")
+
+    def __str__(self):
+        return f"{self.nombre} ({self.micrografia.nombre}), id: {self.id}"
+
+    def verify_model(self):
+        return self.micrografia.region.muestra.material.has_model

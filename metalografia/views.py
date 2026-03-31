@@ -147,6 +147,7 @@ class MicrografiaViewSet(BaseCompanyViewSet):
         micrografia = serializer.save()
 
         # Ejecutamos la primera tarea y le "linkeamos" la segunda
+        print("llamando Worker:")
         transaction.on_commit(
             lambda: process_micrografia_mask.apply_async(
                 args=[micrografia.id],
@@ -240,6 +241,17 @@ class GrainMeasureView(APIView):
         for i in micrografias:
             measure_grain_size(i)
         return Response({"message": "Midiendo tamaño de grano"})
+
+class GetMask(APIView): 
+    def get(self, request, micrografia_id):
+        mask = get_object_or_404(Micrografia_mask, micrografia_id=micrografia_id)   
+        if mask.status != "done" or not mask.imagen:
+            return Response({"error": "Máscara no disponible"}, status=404) 
+        url = mask.imagen.url
+        relative_url = url.split("upload")[-1]
+        relative_url = "/image/upload" + relative_url
+
+        return Response({"mask_url": relative_url})
 
 # class MicrografiaMeasureView(APIView):
 #     def get(self, request, micrografia_id):

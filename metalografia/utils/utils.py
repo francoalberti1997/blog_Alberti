@@ -161,3 +161,4 @@ def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
     print(f"Original: {max_side_original}px | Scale: {scale_factor:.3f} | µm/px final: {um_per_pix:.4f}")
 
     return round(um_per_pix, 4)
+

@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -74,6 +76,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "member",
     'reports',
+    'cloudinary',
 ]
 
 MIDDLEWARE = [
@@ -194,10 +197,10 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # ==================== MEDIA FILES ====================
-MEDIA_URL = '/media/'
+# MEDIA_URL = '/media/'
 
 # Ruta consistente dentro del contenedor (recomendado)
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Forzar siempre la misma ruta (evita el if DEBUG)
 if not DEBUG:
@@ -256,3 +259,19 @@ CELERY_TIMEZONE = 'UTC'
 # Opcional pero recomendado para Celery en la nube
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
+# ============================ CLOUDIFY ===============================
+
+import os
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+load_dotenv()
+# Configuración de Cloudinary (usa las variables que ya pusiste en Render)
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True,          # ← importante para HTTPS
+)

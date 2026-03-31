@@ -1,4 +1,5 @@
 from django.db import models
+from cloudinary.models import CloudinaryField
 
 class Member(models.Model):
     name = models.CharField(max_length=100)
@@ -12,7 +13,7 @@ class Member(models.Model):
 class Company(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField()
-    image = models.ImageField(upload_to="company_logos/", blank=True, null=True)
+    image = CloudinaryField('image')
     
     def __str__(self):
         return self.name
