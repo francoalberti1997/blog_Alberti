@@ -55,6 +55,7 @@ from celery import chain
 import sys
 
 from metalografia.utils.utils import get_um_by_px
+from .models import Material
 
 # =========================================================
 # BASE VIEWSET (multi-tenant)
@@ -252,6 +253,24 @@ class GetMask(APIView):
         relative_url = "/image/upload" + relative_url
 
         return Response({"mask_url": relative_url})
+
+
+class MaterialView(APIView):
+    def get(self, request):
+        
+        materials = Material.objects.filter(
+            muestra__owner=request.user.member.company
+        ).distinct()
+
+        data = [
+            {
+                "nombre": m.nombre,
+                "code": m.code,
+                "has_model": m.has_model
+            }
+            for m in materials
+        ]
+        return Response({"materials": data})
 
 # class MicrografiaMeasureView(APIView):
 #     def get(self, request, micrografia_id):
