@@ -257,13 +257,11 @@ class GetMask(APIView):
 
 class MaterialView(APIView):
     def get(self, request):
-        
-        materials = Material.objects.filter(
-            muestra__owner=request.user.member.company
-        ).distinct()
+
+        materials = Material.objects.all()        
 
         data = [
-            {
+            {   "id": m.id,
                 "nombre": m.nombre,
                 "code": m.code,
                 "has_model": m.has_model
