@@ -179,7 +179,6 @@ def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
 
     # 🔴 FIX ACA
     import requests
-    from PIL import Image
     from io import BytesIO
 
     response = requests.get(micrografia.imagen.url)
