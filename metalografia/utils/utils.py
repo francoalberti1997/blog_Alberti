@@ -126,39 +126,69 @@ import numpy as np
 from django.http import Http404
 
 
+# def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
+#     """
+#     Calcula los micrómetros por píxel después de redimensionar la imagen a 512x512.
+#     """
+#     # 1. Buscar la micrografía de forma segura
+#     micrografia = Micrografia.objects.filter(id=obj_id).first()
+    
+#     if micrografia is None:
+#         raise Http404(f"No existe Micrografia con id = {obj_id}")
+
+#     print(f"Micrografía encontrada: {micrografia.id}")
+
+#     if not micrografia.imagen:
+#         raise ValueError(f"La micrografía {obj_id} no tiene imagen asociada")
+
+#     # 2. Convertir el valor que viene del frontend a float (¡esto soluciona el error!)
+#     try:
+#         um_per_pix_original = float(um_per_pix_original)
+#     except (TypeError, ValueError):
+#         raise ValueError(f"um_by_px_original debe ser un número válido. Recibido: {um_per_pix_original}")
+
+#     # 3. Obtener dimensiones originales de la   
+#     with Image.open(micrografia.imagen.url) as img:
+#         original_width, original_height = img.size   # Mejor usar .size que convertir a array
+
+#     # 4. Calcular factor de escalado
+#     max_side_original = max(original_width, original_height)
+#     scale_factor = max_side_original / 512.0
+
+#     # 5. Cálculo final
+#     um_per_pix = um_per_pix_original * scale_factor
+
+#     print(f"Original: {max_side_original}px | Scale: {scale_factor:.3f} | µm/px final: {um_per_pix:.4f}")
+
+#     return round(um_per_pix, 4)
+
+
 def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
-    """
-    Calcula los micrómetros por píxel después de redimensionar la imagen a 512x512.
-    """
-    # 1. Buscar la micrografía de forma segura
     micrografia = Micrografia.objects.filter(id=obj_id).first()
     
     if micrografia is None:
         raise Http404(f"No existe Micrografia con id = {obj_id}")
 
-    print(f"Micrografía encontrada: {micrografia.id}")
-
     if not micrografia.imagen:
         raise ValueError(f"La micrografía {obj_id} no tiene imagen asociada")
 
-    # 2. Convertir el valor que viene del frontend a float (¡esto soluciona el error!)
     try:
         um_per_pix_original = float(um_per_pix_original)
     except (TypeError, ValueError):
-        raise ValueError(f"um_by_px_original debe ser un número válido. Recibido: {um_per_pix_original}")
+        raise ValueError(f"um_by_px_original inválido: {um_per_pix_original}")
 
-    # 3. Obtener dimensiones originales de la   
-    with Image.open(micrografia.imagen.path) as img:
-        original_width, original_height = img.size   # Mejor usar .size que convertir a array
+    # 🔴 FIX ACA
+    import requests
+    from PIL import Image
+    from io import BytesIO
 
-    # 4. Calcular factor de escalado
+    response = requests.get(micrografia.imagen.url)
+    img = Image.open(BytesIO(response.content))
+    original_width, original_height = img.size
+
     max_side_original = max(original_width, original_height)
     scale_factor = max_side_original / 512.0
 
-    # 5. Cálculo final
     um_per_pix = um_per_pix_original * scale_factor
 
-    print(f"Original: {max_side_original}px | Scale: {scale_factor:.3f} | µm/px final: {um_per_pix:.4f}")
-
     return round(um_per_pix, 4)
-
