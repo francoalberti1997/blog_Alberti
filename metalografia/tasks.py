@@ -160,6 +160,7 @@ from django.core.files.base import ContentFile
 
 @shared_task
 def generate_microstructural_report_pdf(pdf_id: int):
+    print(f"Generando PDF para ReportPDF id: {pdf_id}")
     pdf_obj = ReportPDF.objects.select_related('muestra__material', 'owner__company').get(id=pdf_id)
     muestra = pdf_obj.muestra
 

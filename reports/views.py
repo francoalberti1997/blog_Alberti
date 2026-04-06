@@ -100,6 +100,7 @@ class GeneratePDF(APIView):
             owner=request.user.member,
             muestra=muestra
         )        
+        print(f"Creado ReportPDF con id {pdf_obj.id} para muestra {muestra.nombre} (id: {muestra.id})")
         # Celery (opcional)(
         generate_microstructural_report_pdf.delay(pdf_obj.id)
 

@@ -11,7 +11,7 @@ django-celery-results==2.5.1
 # Ciencia / procesamiento
 numpy==2.4.3
 scipy==1.17.1
-matplotlib==3.10.8
+matplotlib==3.10.8s
 
 # OpenCV (usar headless SIEMPRE en backend) 
 opencv-python-headless==4.13.0.90
