@@ -1,3 +1,4 @@
+
 from celery import shared_task
 import requests
 from django.core.files.base import ContentFile
@@ -7,22 +8,28 @@ from django.core.mail import EmailMessage
 from django.conf import settings
 import os
 from reports.models import ReportPDF
-from .utils.pdf_builder import *
+from metalografia.utils.pdf_builder import build_pdf_content
 from metalografia.utils.utils import *
 from .models import Region, Muestra, Micrografia, MicrographyMeasure
-from django.core.files.base import ContentFile
-from django.conf import settings
 import traceback
 from reports.utils.send_mail import send_report_email
+from collections import defaultdict, Counter
+import numpy as np
+from datetime import datetime
 
+# ====================== IMPORTS PARA EL PDF ======================
+from metalografia.utils.utils import (
+    CALIDADES_FIJAS,
+    assign_calidad,
+    assign_tipo,
+    create_distribution_plot,
+)
 
 BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/"
-
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 import cloudinary.uploader
-from celery import shared_task
-from django.core.files.base import ContentFile  # ya no es necesario, pero lo dejamos por si acaso
+
 
 @shared_task
 def process_micrografia_mask(mask_id):
@@ -48,33 +55,27 @@ def process_micrografia_mask(mask_id):
 
         print("Enviando imagen a Hugging Face...")
         response = requests.post(
-            BASE_PREDICT_URL + micrografia.region.muestra.material.code + "/",  # endpoint dinámico por material
+            BASE_PREDICT_URL + micrografia.region.muestra.material.code + "/",
             headers=headers,
-            files={
-                "file": ("image.png", img_response.content, "image/png")
-            },
+            files={"file": ("image.png", img_response.content, "image/png")},
             timeout=30
         )
 
         print("STATUS HF:", response.status_code)
         response.raise_for_status()
 
-        result = response.content  # bytes de la máscara
+        result = response.content
 
-        # ====================== SUBIDA A CLOUDINARY ======================
         print("Subiendo máscara a Cloudinary...")
-
         upload_result = cloudinary.uploader.upload(
-            result,                                   # acepta bytes directamente
-            folder="masks",                           # carpeta opcional
-            public_id=f"mask_{micrografia.id}",       # nombre único
+            result,
+            folder="masks",
+            public_id=f"mask_{micrografia.id}",
             overwrite=True,
             resource_type="image"
         )
 
-        # Asignamos la URL segura que devuelve Cloudinary
-        mask.imagen = upload_result['secure_url']     # o upload_result['public_id'] según tu config
-
+        mask.imagen = upload_result['secure_url']
         mask.status = "done"
         mask.save()
 
@@ -82,23 +83,16 @@ def process_micrografia_mask(mask_id):
 
     except Exception as e:
         print("ERROR en process_micrografia_mask:", str(e))
-        
         mask.status = "error"
         mask.save(update_fields=['status'])
         raise
 
-    print(f"Retornando id de micrografia: {micrografia.id}")
     return micrografia.id
+
 
 @shared_task()
 def measure_grain_size(micrografia):
-    """
-    Genera grilla de intercepciones usando la imagen y máscara REALES del objeto Micrografia.
-    """
-    # 1. Imagen original
-
     print("INICIANDO PROCESO DE MEDICIÓN")
-
     micrografia = Micrografia.objects.get(id=micrografia)
 
     if not micrografia.imagen:
@@ -106,26 +100,21 @@ def measure_grain_size(micrografia):
 
     img_file = micrografia.imagen.url
 
-    # 2. Máscara (OneToOne)
     if not hasattr(micrografia, 'micrografias_mask'):
         raise ValueError(f"No existe relación micrografias_mask en {micrografia}")
 
     mask_instance = micrografia.micrografias_mask
-
     if not mask_instance.imagen:
         raise ValueError(f"La máscara de {micrografia} no tiene archivo cargado")
 
     mask_file = mask_instance.imagen
 
-    # 4. Llamada (exactamente como la tenías, pero con rutas dinámicas)
     results = generar_grilla_intercepciones_constantes(
-        img_file            = img_file,
-        mask_file           = mask_file,
-        # output_dir          = output_dir,
-        safety_margin_px    = 5,
-        num_rectas_objetivo = 100,
+        img_file=img_file,
+        mask_file=mask_file,
+        safety_margin_px=5,
+        num_rectas_objetivo=100,
     )
-    
 
     micro_measure, _ = MicrographyMeasure.objects.update_or_create(
         micrografia=micrografia,
@@ -143,28 +132,23 @@ def measure_grain_size(micrografia):
         micro_measure.is_valid = False
         micro_measure.save()
         return 1
-    
+
     micro_measure.mean_size = results["mean_grain_size_um"]
     micro_measure.standard_deviation = results["std_grain_size_um"]
     micro_measure.is_valid = validity
-
     micro_measure.save()
-    
+
     return 1
 
-from collections import defaultdict, Counter
-import numpy as np
-import os
-from celery import shared_task
-from django.core.files.base import ContentFile
 
 @shared_task
-def generate_microstructural_report_pdf(pdf_id: int):
-    print(f"Generando PDF para ReportPDF id: {pdf_id}")
+def generate_microstructural_report_pdf(pdf_id: int, per_region: bool = False):
+    print(f"Generando PDF para ReportPDF id: {pdf_id} | per_region={per_region}")
+    
     pdf_obj = ReportPDF.objects.select_related('muestra__material', 'owner__company').get(id=pdf_id)
     muestra = pdf_obj.muestra
 
-    # === Cálculo de tamaños por región ===
+    # === Cálculo de tamaños por región (siempre se ejecuta) ===
     for region in Region.objects.filter(muestra=muestra):
         grain_size = region.get_or_create_size()
         try:
@@ -177,51 +161,71 @@ def generate_microstructural_report_pdf(pdf_id: int):
     institucion = pdf_obj.owner.company.name if pdf_obj.owner.company else ""
     logo_url = pdf_obj.owner.company.image.url if pdf_obj.owner.company and pdf_obj.owner.company.image else None
 
-    from datetime import datetime
     now = datetime.now()
     MESES_ES = [None, 'enero','febrero','marzo','abril','mayo','junio',
                 'julio','agosto','septiembre','octubre','noviembre','diciembre']
     fecha_actual = f"{now.day} de {MESES_ES[now.month]} de {now.year}"
 
-    # === Recolectar todos los granos con medida ===
+    # ====================== RECOLECCIÓN DE DATOS ======================
     grain_data = []
     invalid_micrographs = []
-    for region in Region.objects.filter(muestra=muestra):
-        for micro in region.micrografias.all():
-            """
-            Filtrar por aquellas micrografías con measure_micro. MOSTRAR LAS QUE NO SE CONSIDERAN IGUAL PERO NO MEDIDAS.
-            """
-            try:
-                measure = micro.measure_micro  
-                if measure.mean_size is None or micro.um_by_px is None or (measure.is_valid is False):
-                    print(f"No será tenida en cuenta la micrografía: {micro.nombre}")
-                    invalid_micrographs.append({
-                        "nombre": micro.nombre,
-                    "path": micro.imagen.url if micro.imagen else None,
+
+    if not per_region:
+        # ==================== MODO NORMAL (1 grano = 1 micrografía) ====================
+        for region in Region.objects.filter(muestra=muestra):
+            for micro in region.micrografias.all():
+                try:
+                    measure = micro.measure_micro
+                    if (measure.mean_size is None or 
+                        micro.um_by_px is None or 
+                        measure.is_valid is False):
+                        print(f"No será tenida en cuenta la micrografía: {micro.nombre}")
+                        invalid_micrographs.append({
+                            "nombre": micro.nombre,
+                            "path": micro.imagen.url if micro.imagen else None,
+                        })
+                        continue
+
+                    tc_um, _ = measure.convert_from_px_to_um()
+                    calidad = assign_calidad(tc_um)
+                    tipo = assign_tipo(tc_um)
+
+                    grain_data.append({
+                        'tc_um': tc_um,
+                        'micro': micro,
+                        'region': region,
+                        'calidad': calidad,
+                        'tipo': tipo,
                     })
-                    
+                except Exception:
+                    continue
+    else:
+        # ==================== MODO PER_REGION (1 grano = 1 región) ====================
+        for region in Region.objects.filter(muestra=muestra):
+            try:
+                if not hasattr(region, 'region_measure') or region.region_measure.mean_size is None:
                     continue
 
-                tc_um, _ = measure.convert_from_px_to_um()
-                calidad = assign_calidad(tc_um)
-                tipo = assign_tipo(tc_um)
+                mean_um = region.region_measure.mean_size
+                calidad = assign_calidad(mean_um)
+                tipo = assign_tipo(mean_um)
 
-                grain_data.append({
-                    'tc_um': tc_um,
-                    'micro': micro,
+                grain_data.append({ 
+                    'tc_um': mean_um,
                     'region': region,
                     'calidad': calidad,
                     'tipo': tipo,
+                    # sin 'micro' porque es por región
                 })
-            except Exception as e:
-                continue  # silencioso para no romper todo
+            except Exception:
+                continue
 
     if not grain_data:
         pdf_obj.status = "error_no_data"
         pdf_obj.save()
         return 0
 
-    # === Estadísticas generales ===
+    # ====================== ESTADÍSTICAS ======================
     values = np.array([g['tc_um'] for g in grain_data])
     n_grains = len(values)
 
@@ -233,7 +237,6 @@ def generate_microstructural_report_pdf(pdf_id: int):
 
     count_by_cal = Counter(g['calidad']['label'] for g in grain_data)
 
-    # Tabla de calidades
     calidad_table_data = [["Calidad", "Rango (µm)", "Cantidad", "Porcentaje"]]
     for cal in sorted(CALIDADES_FIJAS, key=lambda c: c["id"]):
         lbl = cal["label"]
@@ -247,54 +250,7 @@ def generate_microstructural_report_pdf(pdf_id: int):
 
     dist_plot_path = create_distribution_plot(values)
 
-    # === Preparar datos de regiones + imágenes ===
-    # regions_data = []
-
-    # for region in Region.objects.filter(muestra=muestra):
-    #     reg_dict = {
-    #         'nombre': region.nombre,
-    #         'titulo': f"Región: {region.nombre}",
-    #         'imagen_path': region.imagen.url if region.imagen else None,
-    #         'calidades': []
-    #     }
-
-    #     # Tamaño medio de la región
-    #     try:
-    #         if hasattr(region, 'region_measure') and region.region_measure.mean_size is not None:
-    #             reg_dict['titulo'] += f" – Tamaño medio: {region.region_measure.mean_size:.1f} µm"
-    #     except:
-    #         pass
-
-    #     # Agrupar micrografías de esta región por calidad
-    #     region_grains = [g for g in grain_data if g['region'].id == region.id]
-    #     region_by_cal = defaultdict(list)
-    #     for g in region_grains:
-    #         region_by_cal[g['calidad']['id']].append(g)
-
-    #     for cal_id in sorted(region_by_cal.keys()):
-    #         cal = next(c for c in CALIDADES_FIJAS if c["id"] == cal_id)
-
-    #         cal_block = {
-    #             'id': cal_id,
-    #             'label': cal['label'],
-    #             'figuras': []
-    #         }
-
-    #         for grain in region_by_cal[cal_id]:
-    #             micro = grain['micro']
-    #             if micro.imagen and os.path.exists(micro.imagen.url):
-    #                 cal_block['figuras'].append({
-    #                     'path': micro.imagen.url,
-    #                     'caption': f"{micro.nombre} – {cal['label']} – Región {region.nombre}"
-    #                 })
-
-    #         if cal_block['figuras']:
-    #             reg_dict['calidades'].append(cal_block)
-
-    #     regions_data.append(reg_dict)
-
-    from collections import defaultdict
-
+    # ====================== CONSTRUCCIÓN DE REGIONES PARA EL PDF ======================
     regions_data = []
 
     for region in Region.objects.filter(muestra=muestra):
@@ -312,49 +268,63 @@ def generate_microstructural_report_pdf(pdf_id: int):
         except:
             pass
 
-        # Agrupar micrografías de esta región por calidad
-        region_grains = [g for g in grain_data if g['region'].id == region.id]
-        region_by_cal = defaultdict(list)
-        for g in region_grains:
-            region_by_cal[g['calidad']['id']].append(g)
-
-        for cal_id in sorted(region_by_cal.keys()):
-            cal = next((c for c in CALIDADES_FIJAS if c["id"] == cal_id), None)
-            if not cal:
+        if per_region:
+            # Modo por región → una sola calidad por región
+            region_entry = next((r for r in grain_data if r['region'].id == region.id), None)
+            if not region_entry:
                 continue
 
+            cal = region_entry['calidad']
+            reg_dict['titulo'] += f" – Calidad: {cal['label']}"
+
             cal_block = {
-                'id': cal_id,
+                'id': cal['id'],
                 'label': cal['label'],
                 'figuras': []
             }
 
-            for grain in region_by_cal[cal_id]:
-                micro = grain['micro']
-                
-                # ✅ CORRECCIÓN: NO usar os.path.exists() con Cloudinary
+            # Mostramos TODAS las micrografías de la región (sin calidades individuales)
+            for micro in region.micrografias.all():
                 image_url = getattr(micro.imagen, 'url', None) if micro.imagen else None
-                
                 if image_url:
                     cal_block['figuras'].append({
-                        'path': image_url,   # URL de Cloudinary
-                        'caption': f"{micro.nombre} – {cal['label']} – Región {region.nombre}"
+                        'path': image_url,
+                        'caption': f"{micro.nombre} – Región {region.nombre}"
                     })
 
-            # Solo agregar el bloque de calidad si tiene al menos una figura
             if cal_block['figuras']:
                 reg_dict['calidades'].append(cal_block)
 
+        else:
+            # Modo normal (por micrografía)
+            region_grains = [g for g in grain_data if g['region'].id == region.id]
+            region_by_cal = defaultdict(list)
+            for g in region_grains:
+                region_by_cal[g['calidad']['id']].append(g)
+
+            for cal_id in sorted(region_by_cal.keys()):
+                cal = next((c for c in CALIDADES_FIJAS if c["id"] == cal_id), None)
+                if not cal:
+                    continue
+
+                cal_block = {'id': cal_id, 'label': cal['label'], 'figuras': []}
+
+                for grain in region_by_cal[cal_id]:
+                    micro = grain['micro']
+                    image_url = getattr(micro.imagen, 'url', None) if micro.imagen else None
+                    if image_url:
+                        caption = f"{micro.nombre} – {cal['label']} – {grain['tc_um']:.1f} µm – Región {region.nombre}"
+                        cal_block['figuras'].append({
+                            'path': image_url,
+                            'caption': caption
+                        })
+
+                if cal_block['figuras']:
+                    reg_dict['calidades'].append(cal_block)
+
         regions_data.append(reg_dict)
 
-    # Debug: ver qué se está generando
-    print(f"Regiones generadas: {len(regions_data)}")
-    for r in regions_data:
-        print(f"  - {r['nombre']}: {len(r['calidades'])} calidades")
-        for c in r['calidades']:
-            print(f"    → Calidad {c['id']}: {len(c['figuras'])} figuras")
-
-    # === Diccionario para el PDF ===
+    # ====================== DATA FINAL PARA EL PDF ======================
     data = {
         'muestra_id': muestra.id,
         'material_name': muestra.material.nombre if muestra.material else "Material no especificado",
@@ -371,19 +341,18 @@ def generate_microstructural_report_pdf(pdf_id: int):
         'n_calidades': n_calidades_encontradas,
         'calidad_table_data': calidad_table_data,
         'dist_plot_path': dist_plot_path,
-        # 'muestra_imagen_path': muestra.imagen.url if getattr(muestra, 'imagen', None) and os.path.exists(muestra.imagen.url) else None,
-        'muestra_imagen_path': muestra.imagen.url if hasattr(muestra.imagen, 'url') else None,        
+        'muestra_imagen_path': getattr(muestra.imagen, 'url', None) if hasattr(muestra, 'imagen') else None,
         'regions': regions_data,
         "logo_url": logo_url,
-        "invalid_micrographs": invalid_micrographs
+        "invalid_micrographs": invalid_micrographs,
     }
 
-    # === Generar PDF ===
+    # ====================== GENERAR PDF ======================
     pdf_bytes, filename = build_pdf_content(data)
 
     pdf_obj.file.save(filename, ContentFile(pdf_bytes), save=False)
-    # pdf_obj.status = "done"
     pdf_obj.save()
+
     print("Enviando reporte al server remoto")
     send_report_email(pdf_id=pdf_obj.id)
     return 1
