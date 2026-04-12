@@ -25,3 +25,6 @@ class ReportPDF(models.Model):
     
     value = models.CharField(max_length=8, default=generate_code, blank=True, null=True)
 
+    has_mask = models.BooleanField(default=False)
+
+    

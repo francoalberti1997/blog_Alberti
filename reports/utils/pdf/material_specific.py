@@ -5,8 +5,8 @@ from .material.lcs import build_steel
 from .material.magnesia import build_magnesia
 
 MATERIAL_BUILDERS = {
-    "steel": build_steel,
-    "magnesia": build_magnesia,
+    "Acero de bajo carbono": build_steel,
+    "Magnesia": build_magnesia,
 }
 
 
@@ -25,6 +25,7 @@ def fallback_material(material_name: str) -> list:
 def build_material_specific(data: dict) -> list:
     material_name = data["meta"]["material_name"]
 
+    print(f"Construyendo sección específica para material: {material_name}")
     builder = MATERIAL_BUILDERS.get(material_name)
 
     if builder:

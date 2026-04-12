@@ -65,6 +65,7 @@ class Micrografia_mask(models.Model):
     micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="micrografias_mask", blank=True, null=True)
     nombre = models.CharField(max_length=100)
     imagen = CloudinaryField('image')
+    imagen_multiclass = CloudinaryField('image', null=True, blank=True)
     status = models.CharField(max_length=50, default="pending")
 
     def __str__(self):
@@ -135,15 +136,3 @@ class MicrographyMeasure(models.Model):
     def __str__(self):
         return ((f"micrografia: {self.micrografia.nombre}"))
     
-
-class MultiMicrografia_mask(models.Model):
-    micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, blank=True, null=True)
-    nombre = models.CharField(max_length=100)
-    imagen = CloudinaryField('image')
-    status = models.CharField(max_length=50, default="pending")
-
-    def __str__(self):
-        return f"{self.nombre} ({self.micrografia.nombre}), id: {self.id}"
-
-    def verify_model(self):
-        return self.micrografia.region.muestra.material.has_model

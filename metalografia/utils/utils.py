@@ -116,8 +116,8 @@ def create_crystals_distribution_plot(data, title="", highlight_value=None, high
 
     # Estadísticas en el gráfico
     plt.text(0.02, 0.96,
-             f"Media: {mean_d:.2f} µm\n"
-             f"Desv. Est.: {std_d:.2f} µm",
+             f"Media: {mean_d:.2f} µm\n",
+            #  f"Desv. Est.: {std_d:.2f} µm",
              transform=plt.gca().transAxes,
              fontsize=11,
              verticalalignment='top',
@@ -248,8 +248,6 @@ def get_quality(size):
             return i
     return None
 
-
-# ====================== NUEVA FUNCIÓN (la que pediste) ======================
 def create_quality_distribution_plot(qualities_list, 
                                      title="Distribución de Calidades de Grano",
                                      xlabel="Calidad de Grano",
@@ -303,3 +301,76 @@ def create_quality_distribution_plot(qualities_list,
     plt.close()
 
     return os.path.abspath(save_path)
+
+
+def create_intercept_distribution_plot(data, title="", highlight_value=None, highlight_label=None,
+                                       highlight_color='red'):
+    """
+    Crea histograma + KDE para LONGITUD MEDIA DE INTERCEPTO (µm)
+    - Ideal para acero con método de interceptos (ASTM E112)
+    - Sin ninguna referencia a 'calidad' ni a números ASTM
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from collections import Counter
+    from uuid import uuid4
+    import os
+    from django.conf import settings
+
+
+    data = np.array(data)
+
+    # Estadísticos
+    mean_val = np.mean(data)
+    std_val = np.std(data)
+    xmin = np.min(data)
+    xmax = np.max(data)
+
+    # ====================== GRÁFICO ======================
+    plt.figure(figsize=(11, 7), dpi=180)
+    sns.set_style("whitegrid")
+
+    # Histograma base
+    plt.hist(data, bins=25, density=True, alpha=0.30,
+             color='lightgray', edgecolor='black')
+
+    # KDE (curva suave)
+    sns.kdeplot(data, color='black', linewidth=2.8, label='KDE')
+
+    # Media de la región (línea roja gruesa)
+    if highlight_value is not None:
+        plt.axvline(highlight_value, color=highlight_color, linestyle='--', linewidth=3.5,
+                    label=highlight_label or f'Media = {highlight_value:.2f} µm')
+
+    # Media general (opcional - descomentar si querés)
+    # plt.axvline(mean_val, color='darkblue', linestyle='-', linewidth=2.5,
+    #             label=f'Media general = {mean_val:.2f} µm')
+
+    plt.xlabel("Longitud media de intercepto (µm)", fontsize=13, fontweight='bold')
+    plt.ylabel("Densidad de probabilidad", fontsize=13, fontweight='bold')
+    plt.title(title or "Distribución de Longitud de Intercepto", fontsize=14, pad=20)
+
+    plt.xlim(xmin - 5, xmax + 5)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.legend(fontsize=12.5, framealpha=0.95, loc='upper right')
+
+    # Texto con estadísticos
+    plt.text(0.02, 0.96,
+             f"Media: {mean_val:.2f} µm\n",
+            transform=plt.gca().transAxes,
+             fontsize=11.5,
+             verticalalignment='top',
+             bbox=dict(boxstyle="round,pad=0.6", facecolor='white', alpha=0.92))
+
+    plt.tight_layout()
+
+    # Guardar
+    os.makedirs(os.path.join(settings.MEDIA_ROOT, 'temp_plots'), exist_ok=True)
+    filename = f"intercept_dist_{uuid4().hex[:16]}.png"
+    save_path = os.path.join(settings.MEDIA_ROOT, 'temp_plots', filename)
+
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return save_path

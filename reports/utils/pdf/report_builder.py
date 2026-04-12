@@ -10,7 +10,6 @@ from io import BytesIO
 from reports.utils.pdf.material.lcs import build_steel_data
 from reports.utils.pdf.material.magnesia import build_magnesia_data
 
-
 from .cover import build_cover
 from .toc import build_toc
 from .sample_metadata import build_sample_metadata
@@ -27,6 +26,7 @@ def first_page(canvas, doc):
     canvas.setFillColor(colors.dimgray)
     canvas.drawCentredString(doc.width / 2 + doc.leftMargin, 1.5 * cm, f"Fecha: {doc._fecha_actual}")
     canvas.restoreState()
+
 
 def later_pages(canvas, doc):
     from reportlab.lib import colors
@@ -48,6 +48,7 @@ def later_pages(canvas, doc):
     canvas.drawRightString(doc.width + doc.leftMargin - 0.5*cm, 1.5*cm, doc._fecha_actual)
     canvas.restoreState()
 
+
 def build_full_report_pdf(data: dict) -> tuple[bytes, str]:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -56,7 +57,6 @@ def build_full_report_pdf(data: dict) -> tuple[bytes, str]:
         topMargin=4.0*cm, bottomMargin=2.8*cm
     )
 
-    
     meta = data["meta"]
 
     doc._material_name = meta['material_name']
@@ -67,10 +67,11 @@ def build_full_report_pdf(data: dict) -> tuple[bytes, str]:
     elements.extend(build_toc())
     elements.extend(build_sample_metadata(meta))
     
-    #Incluir acá argumentos para incluir secciones específicas según el material
+    # Incluir acá argumentos para incluir secciones de normas.
     elements.extend(build_material_specific(data))
 
-    elements.extend(build_masks(meta))
+    if meta.get("has_mask") is True:
+        elements.extend(build_masks(meta))
     
     elements.extend(build_conclusions(meta))
     
@@ -94,6 +95,7 @@ MESES_ES = [
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
 ]
 
+
 def build_pdf_data(pdf_obj) -> dict:
     return {
         "meta": build_common_data(pdf_obj),
@@ -116,29 +118,40 @@ def build_common_data(pdf_obj) -> dict:
     now = datetime.now()
     fecha_actual = f"{now.day} de {MESES_ES[now.month]} de {now.year}"
 
+    # === DINÁMICO: nombre real del material desde la base de datos ===
+    material_name = muestra.material.nombre if muestra.material else "Material desconocido"
+
     return {
         "muestra_id": muestra.id,
-        "material_name": "magnesia",  # 👈 clave real
+        "material_name": material_name,          # ← ahora es dinámico
         "muestra_nombre": muestra.nombre,
         "fecha_actual": fecha_actual,
         "operador_nombre": operador_nombre,
         "institucion": institucion,
         "logo_url": logo_url,
+        "has_mask": pdf_obj.has_mask,
     }
+
 
 def build_material_data(pdf_obj) -> dict:
-    material_name = "magnesia" 
+    muestra = pdf_obj.muestra
+
+    if not muestra.material:
+        print("⚠️ La muestra no tiene material asociado")
+        return {}
+
+    material_key = muestra.material.code.lower()   # "steel", "magnesia", etc.
 
     builders = {
-        "steel": build_steel_data,
-        "magnesia": build_magnesia_data,
+        "45951": build_steel_data,
+        "45956": build_magnesia_data,
     }
 
-    builder = builders.get(material_name)
+    builder = builders.get(material_key)
 
     if not builder:
+        print(f"⚠️ No hay builder definido para el material con código '{material_key}'")
         return {}
-    
-    print(("builder(pdf_obj): ", builder(pdf_obj)))
 
+    print(f"Usando builder para material: {material_key}")
     return builder(pdf_obj)

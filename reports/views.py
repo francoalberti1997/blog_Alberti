@@ -96,12 +96,20 @@ class GeneratePDF(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
+        # ================================================
+        # NUEVO: Campo opcional include_masks
+        # Si no viene en el request → no pasa nada (usa default=False del modelo)
+        # Si viene → se setea has_mask con el booleano recibido
+        # ================================================
+        include_masks = request.data.get("include_masks")
+
         pdf_obj = ReportPDF.objects.create(
             owner=request.user.member,
-            muestra=muestra
+            muestra=muestra,
+            has_mask=include_masks if include_masks is not None else False
         )        
         print(f"Creado ReportPDF con id {pdf_obj.id} para muestra {muestra.nombre} (id: {muestra.id})")
-        # Celery (opcional)(
+        # Celery (opcional)
         generate_microstructural_report_pdf.delay(pdf_obj.id)
 
         return Response({

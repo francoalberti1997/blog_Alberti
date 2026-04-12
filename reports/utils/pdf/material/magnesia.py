@@ -412,9 +412,7 @@ def build_magnesia(data: dict) -> list:
                         img_micro = Image(img_data, width=w, height=h)
 
                         caption = (f"{micro['nombre']} — Original "
-                                  f"(Tamaño medio: {micro['mean_um']} µm "
-                                  f"± {micro.get('std_um') or '—'} µm)")
-
+                                  f"(Tamaño medio: {micro['mean_um']} µm ")
                         micro_section.extend([
                             KeepTogether([
                                 img_micro,
@@ -471,6 +469,6 @@ def build_magnesia(data: dict) -> list:
         detailed_section.append(Spacer(1, 0.4 * cm))
 
     elements.append(KeepTogether(detailed_section))
-    elements.append(PageBreak())
+    # elements.append(PageBreak())
 
     return elements

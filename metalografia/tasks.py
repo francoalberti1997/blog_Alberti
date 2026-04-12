@@ -153,7 +153,6 @@ def measure_grain_size(micrografia):
 @shared_task
 def generate_microstructural_report_pdf(pdf_id: int):
 
-
     print(f"Generando PDF ESQUELETO para ReportPDF id: {pdf_id}")
 
     pdf_obj = ReportPDF.objects.get(id=pdf_id)
