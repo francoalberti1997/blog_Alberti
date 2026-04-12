@@ -2,6 +2,9 @@
 import os
 from celery import Celery
 
+from dotenv import load_dotenv
+load_dotenv()
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "albertidl.settings")
 
 app = Celery("myproject")

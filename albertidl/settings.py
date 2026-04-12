@@ -13,7 +13,19 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+# load_dotenv()
+
+# ============================ CLOUDIFY ===============================
+
+import os
+import cloudinary
+
+cloudinary.config(
+    cloud_name="dtockjrdq",
+    api_key="186618873237985",
+    api_secret="KtbQqfUnhrbu1kwko4u3oGnTphA",
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -260,18 +272,3 @@ CELERY_TIMEZONE = 'UTC'
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 
-# ============================ CLOUDIFY ===============================
-
-import os
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
-
-load_dotenv()
-# Configuración de Cloudinary (usa las variables que ya pusiste en Render)
-cloudinary.config(
-    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.environ.get('CLOUDINARY_API_KEY'),
-    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
-    secure=True,          # ← importante para HTTPS
-)

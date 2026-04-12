@@ -2,37 +2,31 @@
 from celery import shared_task
 import requests
 from django.core.files.base import ContentFile
+
+from reports.utils.pdf.report_builder import build_full_report_pdf
 from .models import Micrografia_mask
 from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
 from django.core.mail import EmailMessage
 from django.conf import settings
 import os
 from reports.models import ReportPDF
-from metalografia.utils.pdf_builder import build_pdf_content
-from metalografia.utils.utils import *
 from .models import Region, Muestra, Micrografia, MicrographyMeasure
 import traceback
 from reports.utils.send_mail import send_report_email
 from collections import defaultdict, Counter
 import numpy as np
 from datetime import datetime
+import cloudinary                 
+import cloudinary.uploader         
 
 # ====================== IMPORTS PARA EL PDF ======================
-from metalografia.utils.utils import (
-    CALIDADES_FIJAS,
-    assign_calidad,
-    assign_tipo,
-    create_distribution_plot,
-)
 
 BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/"
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-import cloudinary.uploader
-
-
 @shared_task
 def process_micrografia_mask(mask_id):
+
     micrografia = Micrografia.objects.get(id=mask_id)
 
     mask = Micrografia_mask.objects.create(
@@ -122,8 +116,23 @@ def measure_grain_size(micrografia):
             "mean_size": results["mean_grain_size_um"],
             "standard_deviation": results["std_grain_size_um"],
             "is_valid": results["is_valid"],
+            "distribution_quantiles": results["distribution_quantiles"],   
         }
     )
+
+
+    if results["visualization_bytes"]:
+        upload_result = cloudinary.uploader.upload(
+            results["visualization_bytes"],
+            folder="measurements",
+            public_id=f"rectas_{micrografia.id}",
+            overwrite=True,
+            resource_type="image"
+        )
+
+        micro_measure.imagen = upload_result["secure_url"]
+        micro_measure.save()
+
 
     validity = results["is_valid"]
     print(f"Validity: {validity}")
@@ -142,9 +151,13 @@ def measure_grain_size(micrografia):
 
 
 @shared_task
-def generate_microstructural_report_pdf(pdf_id: int, per_region: bool = False):
-    print(f"Generando PDF para ReportPDF id: {pdf_id} | per_region={per_region}")
-    
+def generate_microstructural_report_pdf(pdf_id: int):
+
+
+    print(f"Generando PDF ESQUELETO para ReportPDF id: {pdf_id}")
+
+    pdf_obj = ReportPDF.objects.get(id=pdf_id)
+
     pdf_obj = ReportPDF.objects.select_related('muestra__material', 'owner__company').get(id=pdf_id)
     muestra = pdf_obj.muestra
 
@@ -156,203 +169,18 @@ def generate_microstructural_report_pdf(pdf_id: int, per_region: bool = False):
         except Exception:
             pass
 
-    # === Datos básicos ===
-    operador_nombre = f"{pdf_obj.owner.name} {pdf_obj.owner.surname}"
-    institucion = pdf_obj.owner.company.name if pdf_obj.owner.company else ""
-    logo_url = pdf_obj.owner.company.image.url if pdf_obj.owner.company and pdf_obj.owner.company.image else None
+    from reports.utils.pdf.report_builder import build_full_report_pdf, build_pdf_data
 
-    now = datetime.now()
-    MESES_ES = [None, 'enero','febrero','marzo','abril','mayo','junio',
-                'julio','agosto','septiembre','octubre','noviembre','diciembre']
-    fecha_actual = f"{now.day} de {MESES_ES[now.month]} de {now.year}"
+    data = build_pdf_data(pdf_obj)
 
-    # ====================== RECOLECCIÓN DE DATOS ======================
-    grain_data = []
-    invalid_micrographs = []
+    print("Data para PDF construida:", data)
 
-    if not per_region:
-        # ==================== MODO NORMAL (1 grano = 1 micrografía) ====================
-        for region in Region.objects.filter(muestra=muestra):
-            for micro in region.micrografias.all():
-                try:
-                    measure = micro.measure_micro
-                    if (measure.mean_size is None or 
-                        micro.um_by_px is None or 
-                        measure.is_valid is False):
-                        print(f"No será tenida en cuenta la micrografía: {micro.nombre}")
-                        invalid_micrographs.append({
-                            "nombre": micro.nombre,
-                            "path": micro.imagen.url if micro.imagen else None,
-                        })
-                        continue
-
-                    tc_um, _ = measure.convert_from_px_to_um()
-                    calidad = assign_calidad(tc_um)
-                    tipo = assign_tipo(tc_um)
-
-                    grain_data.append({
-                        'tc_um': tc_um,
-                        'micro': micro,
-                        'region': region,
-                        'calidad': calidad,
-                        'tipo': tipo,
-                    })
-                except Exception:
-                    continue
-    else:
-        # ==================== MODO PER_REGION (1 grano = 1 región) ====================
-        for region in Region.objects.filter(muestra=muestra):
-            try:
-                if not hasattr(region, 'region_measure') or region.region_measure.mean_size is None:
-                    continue
-
-                mean_um = region.region_measure.mean_size
-                calidad = assign_calidad(mean_um)
-                tipo = assign_tipo(mean_um)
-
-                grain_data.append({ 
-                    'tc_um': mean_um,
-                    'region': region,
-                    'calidad': calidad,
-                    'tipo': tipo,
-                    # sin 'micro' porque es por región
-                })
-            except Exception:
-                continue
-
-    if not grain_data:
-        pdf_obj.status = "error_no_data"
-        pdf_obj.save()
-        return 0
-
-    # ====================== ESTADÍSTICAS ======================
-    values = np.array([g['tc_um'] for g in grain_data])
-    n_grains = len(values)
-
-    sinter_grains = [g for g in grain_data if g['tipo'] == "sinterizado"]
-    electro_grains = [g for g in grain_data if g['tipo'] == "electrofundido"]
-
-    sinter_pct = len(sinter_grains) / n_grains * 100 if n_grains else 0
-    electro_pct = 100 - sinter_pct
-
-    count_by_cal = Counter(g['calidad']['label'] for g in grain_data)
-
-    calidad_table_data = [["Calidad", "Rango (µm)", "Cantidad", "Porcentaje"]]
-    for cal in sorted(CALIDADES_FIJAS, key=lambda c: c["id"]):
-        lbl = cal["label"]
-        cnt = count_by_cal[lbl]
-        pct = cnt / n_grains * 100 if n_grains else 0
-        rango_str = f"{cal['min']}–{cal['max'] if cal['max'] < 99999 else '>900'}"
-        calidad_table_data.append([lbl, rango_str, cnt, f"{pct:.1f}%"])
-
-    dominant_label = count_by_cal.most_common(1)[0][0] if count_by_cal else "—"
-    n_calidades_encontradas = len(count_by_cal)
-
-    dist_plot_path = create_distribution_plot(values)
-
-    # ====================== CONSTRUCCIÓN DE REGIONES PARA EL PDF ======================
-    regions_data = []
-
-    for region in Region.objects.filter(muestra=muestra):
-        reg_dict = {
-            'nombre': region.nombre,
-            'titulo': f"Región: {region.nombre}",
-            'imagen_path': getattr(region.imagen, 'url', None) if region.imagen else None,
-            'calidades': []
-        }
-
-        # Tamaño medio de la región
-        try:
-            if hasattr(region, 'region_measure') and region.region_measure.mean_size is not None:
-                reg_dict['titulo'] += f" – Tamaño medio: {region.region_measure.mean_size:.1f} µm"
-        except:
-            pass
-
-        if per_region:
-            # Modo por región → una sola calidad por región
-            region_entry = next((r for r in grain_data if r['region'].id == region.id), None)
-            if not region_entry:
-                continue
-
-            cal = region_entry['calidad']
-            reg_dict['titulo'] += f" – Calidad: {cal['label']}"
-
-            cal_block = {
-                'id': cal['id'],
-                'label': cal['label'],
-                'figuras': []
-            }
-
-            # Mostramos TODAS las micrografías de la región (sin calidades individuales)
-            for micro in region.micrografias.all():
-                image_url = getattr(micro.imagen, 'url', None) if micro.imagen else None
-                if image_url:
-                    cal_block['figuras'].append({
-                        'path': image_url,
-                        'caption': f"{micro.nombre} – Región {region.nombre}"
-                    })
-
-            if cal_block['figuras']:
-                reg_dict['calidades'].append(cal_block)
-
-        else:
-            # Modo normal (por micrografía)
-            region_grains = [g for g in grain_data if g['region'].id == region.id]
-            region_by_cal = defaultdict(list)
-            for g in region_grains:
-                region_by_cal[g['calidad']['id']].append(g)
-
-            for cal_id in sorted(region_by_cal.keys()):
-                cal = next((c for c in CALIDADES_FIJAS if c["id"] == cal_id), None)
-                if not cal:
-                    continue
-
-                cal_block = {'id': cal_id, 'label': cal['label'], 'figuras': []}
-
-                for grain in region_by_cal[cal_id]:
-                    micro = grain['micro']
-                    image_url = getattr(micro.imagen, 'url', None) if micro.imagen else None
-                    if image_url:
-                        caption = f"{micro.nombre} – {cal['label']} – {grain['tc_um']:.1f} µm – Región {region.nombre}"
-                        cal_block['figuras'].append({
-                            'path': image_url,
-                            'caption': caption
-                        })
-
-                if cal_block['figuras']:
-                    reg_dict['calidades'].append(cal_block)
-
-        regions_data.append(reg_dict)
-
-    # ====================== DATA FINAL PARA EL PDF ======================
-    data = {
-        'muestra_id': muestra.id,
-        'material_name': muestra.material.nombre if muestra.material else "Material no especificado",
-        'muestra_nombre': muestra.nombre,
-        'fecha_actual': fecha_actual,
-        'operador_nombre': operador_nombre,
-        'institucion': institucion,
-        'n_grains': n_grains,
-        'len_sinter': len(sinter_grains),
-        'len_electro': len(electro_grains),
-        'sinter_pct': sinter_pct,
-        'electro_pct': electro_pct,
-        'dominant_label': dominant_label,
-        'n_calidades': n_calidades_encontradas,
-        'calidad_table_data': calidad_table_data,
-        'dist_plot_path': dist_plot_path,
-        'muestra_imagen_path': getattr(muestra.imagen, 'url', None) if hasattr(muestra, 'imagen') else None,
-        'regions': regions_data,
-        "logo_url": logo_url,
-        "invalid_micrographs": invalid_micrographs,
-    }
-
-    # ====================== GENERAR PDF ======================
-    pdf_bytes, filename = build_pdf_content(data)
+    pdf_bytes, filename = build_full_report_pdf(data)
 
     pdf_obj.file.save(filename, ContentFile(pdf_bytes), save=False)
     pdf_obj.save()
 
-    print("Enviando reporte al server remoto")
     send_report_email(pdf_id=pdf_obj.id)
+
+    print(f"✅ PDF generado → {filename}")
     return 1

@@ -13,6 +13,7 @@ class Material(models.Model):
     nombre = models.CharField(max_length=100)
     code = models.CharField(max_length=50, unique=True)
     has_model = models.BooleanField(default=False)
+    
 
     def __str__(self):
         return self.nombre
@@ -117,6 +118,14 @@ class MicrographyMeasure(models.Model):
     standard_deviation = models.FloatField(null=True, blank=True)   
     micrografia = models.OneToOneField(Micrografia, on_delete=models.CASCADE, related_name="measure_micro")
     is_valid = models.BooleanField(blank=True, null=True)
+    imagen = CloudinaryField('image', null=True, blank=True)
+
+    distribution_quantiles = models.JSONField(
+        null=True,
+        blank=True,
+        default=dict,
+        help_text="10 deciles de los tamaños de grano individuales en píxeles"
+    )
 
     def convert_from_px_to_um(self):
         if self.micrografia.um_by_px is None:

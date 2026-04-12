@@ -11,98 +11,167 @@ from metalografia.models import Micrografia
 from reportlab.platypus import Image
 from PIL import Image
 import numpy as np
-
+from scipy.stats import gaussian_kde
 from reportlab.platypus import Image as RLImage
 from PIL import Image as PILImage
-
-# ====================== CALIDADES FIJAS ======================
-CALIDADES_FIJAS = [
-    {"id": 1, "tipo": "sinterizado", "min": 40,  "max": 90,   "label": "Calidad 1: 40–90 µm"},
-    {"id": 2, "tipo": "sinterizado", "min": 100, "max": 200,  "label": "Calidad 2: 100–200 µm"},
-    {"id": 3, "tipo": "sinterizado", "min": 200, "max": 250,  "label": "Calidad 3: 200–250 µm"},
-    {"id": 4, "tipo": "sinterizado", "min": 300, "max": 350,  "label": "Calidad 4: 300–350 µm"},
-    {"id": 5, "tipo": "electrofundido", "min": 400, "max": 500,  "label": "Calidad 5: 400–500 µm"},
-    {"id": 6, "tipo": "electrofundido", "min": 550, "max": 600,  "label": "Calidad 6: 550–600 µm"},
-    {"id": 7, "tipo": "electrofundido", "min": 600, "max": 700,  "label": "Calidad 7: 600–700 µm"},
-    {"id": 8, "tipo": "electrofundido", "min": 700, "max": 800,  "label": "Calidad 8: 700–800 µm"},
-    {"id": 9, "tipo": "electrofundido", "min": 800, "max": 900,  "label": "Calidad 9: 800–900 µm"},
-    {"id": 10,"tipo": "electrofundido", "min": 901, "max": 99999,"label": "Calidad 10: >900 µm"},
-]
+import seaborn as sns
+from reportlab.platypus import Image
+from metalografia.models import Micrografia
+from reportlab.platypus import Image
+from PIL import Image
+from django.http import Http404
+import tempfile
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+import numpy as np
+from uuid import uuid4   
 
 
-def assign_calidad(tc_um):
-    for cal in CALIDADES_FIJAS:
-        if cal["min"] <= tc_um <= cal["max"]:
-            return cal
-    if tc_um > 900:
-        return next(c for c in CALIDADES_FIJAS if c["id"] == 10)
-    if tc_um < 40:
-        return next(c for c in CALIDADES_FIJAS if c["id"] == 1)
-    return min(CALIDADES_FIJAS, key=lambda c: abs(tc_um - c["min"]))
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+from django.conf import settings
+
+def create_crystals_distribution_plot(data, title="", highlight_value=None, highlight_label=None, 
+                                      highlight_color='red', umbral=400):
+    """
+    Crea histograma + KDE con áreas coloreadas:
+    - Azul claro: Sinterizado (< 400 µm)
+    - Naranja: Electrofundido (≥ 400 µm)
+    - Línea roja punteada: Media de la región
+    """
+    if len(data) < 3:
+        raise ValueError("No hay suficientes datos para generar el gráfico con KDE")
+
+    data = np.array(data)
+
+    # Estadísticos
+    mean_d = np.mean(data)
+    std_d = np.std(data)
+    xmin = np.min(data)
+    xmax = np.max(data)
+
+    # KDE (curva suave)
+    kde = gaussian_kde(data)
+    x_vals = np.linspace(xmin - 0.05*(xmax - xmin), xmax + 0.05*(xmax - xmin), 1000)
+    y_vals = kde(x_vals)
+
+    # Área total bajo la curva
+    area_total = np.trapezoid(y_vals, x_vals)
+    mask_sinter = x_vals < umbral
+    mask_electro = x_vals >= umbral
+
+    area_sinter = np.trapezoid(y_vals[mask_sinter], x_vals[mask_sinter])
+    area_electro = np.trapezoid(y_vals[mask_electro], x_vals[mask_electro])
+
+    pct_area_sinter = (area_sinter / area_total * 100) if area_total > 0 else 0
+    pct_area_electro = (area_electro / area_total * 100) if area_total > 0 else 0
+
+    # Porcentaje real de puntos
+    pct_sinter = np.sum(data < umbral) / len(data) * 100
+    pct_electro = 100 - pct_sinter
+
+    # ====================== GRÁFICO ======================
+    plt.figure(figsize=(11, 7), dpi=180)
+
+    # Histograma base (transparente)
+    plt.hist(data, bins=25, density=True, alpha=0.25,
+             color='lightgray', edgecolor='black', label='_nolegend_')
+
+    # KDE completa
+    plt.plot(x_vals, y_vals, color='black', linewidth=2.5, label='KDE')
+
+    # Áreas coloreadas
+    plt.fill_between(x_vals[mask_sinter], y_vals[mask_sinter], color='#3498db', alpha=0.45,
+                     label=f"Sinterizada (< {umbral} µm)\n"
+                           f"Área KDE: {pct_area_sinter:.1f}%\n"
+                           f"Puntos: {pct_sinter:.1f}%")
+
+    plt.fill_between(x_vals[mask_electro], y_vals[mask_electro], color='#e67e22', alpha=0.45,
+                     label=f"Electrofundida (≥ {umbral} µm)\n"
+                           f"Área KDE: {pct_area_electro:.1f}%\n"
+                           f"Puntos: {pct_electro:.1f}%")
+
+    # Línea del umbral
+    plt.axvline(umbral, color='black', linestyle='--', linewidth=2.2, label=f'Umbral = {umbral} µm')
+
+    # Media de la región (rojo)
+    if highlight_value is not None:
+        plt.axvline(highlight_value, color=highlight_color, linestyle='--', linewidth=3.5,
+                    label=highlight_label or f'Media región = {highlight_value:.2f} µm')
+
+    # # Media general
+    # plt.axvline(mean_d, color='darkblue', linestyle='-', linewidth=2.8,
+    #             label=f'Media general = {mean_d:.2f} µm')
+
+    # Etiquetas y estilo
+    plt.xlabel("Tamaño de cristal (µm)", fontsize=13)
+    plt.ylabel("Densidad de probabilidad", fontsize=13)
+    plt.title(title, fontsize=14, fontweight='bold', pad=20)
+
+    plt.xlim(xmin - 5, xmax + 5)
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.legend(fontsize=13.5, framealpha=0.95, loc='upper right')
+
+    # Estadísticas en el gráfico
+    plt.text(0.02, 0.96,
+             f"Media: {mean_d:.2f} µm\n"
+             f"Desv. Est.: {std_d:.2f} µm",
+             transform=plt.gca().transAxes,
+             fontsize=11,
+             verticalalignment='top',
+             bbox=dict(boxstyle="round,pad=0.6", facecolor='white', alpha=0.9))
+
+    plt.tight_layout()
+
+    # Guardar
+    os.makedirs(os.path.join(settings.MEDIA_ROOT, 'temp_plots'), exist_ok=True)
+    filename = f"crystals_dist_{uuid4().hex[:16]}.png"
+    save_path = os.path.join(settings.MEDIA_ROOT, 'temp_plots', filename)
+
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return save_path
 
 
-def assign_tipo(tc_um):
-    return "sinterizado" if tc_um <= 400 else "electrofundido"
-
-
-def create_distribution_plot(values):
-    if len(values) == 0:
+def create_distribution_plot(data, title="Distribución de tamaños de grano", xlabel="Tamaño (µm)", ylabel="Frecuencia", bins=15, save_path=None):
+    """
+    Crea un histograma de distribución y guarda la imagen.
+    Retorna la ruta absoluta del archivo PNG generado.
+    """
+    if len(data) == 0:
         return None
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        fig, ax = plt.subplots(figsize=(14, 8.5), dpi=190)
+    # Configuración visual bonita
+    plt.figure(figsize=(10, 6))
+    sns.set_style("whitegrid")
+    
+    ax = sns.histplot(data, bins=bins, kde=True, color="#2C3E50", edgecolor="black", alpha=0.8)
+    
+    ax.set_title(title, fontsize=14, pad=20)
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+    
+    # Añadir media y mediana
+    mean = data.mean()
+    ax.axvline(mean, color='red', linestyle='--', linewidth=2, label=f'Media: {mean:.1f} µm')
+    ax.legend()
 
-        ax.hist(values, bins=np.arange(0, max(1250, values.max() + 150), 50),
-                color="#4682B4", edgecolor="white", alpha=0.82, linewidth=0.8, zorder=3)
+    plt.tight_layout()
 
-        if len(values) > 10:
-            from scipy.stats import gaussian_kde
+    # Guardar en carpeta temporal
+    if save_path is None:
+        temp_dir = "temp_plots"  # o usa settings.MEDIA_ROOT + "/temp_plots"
+        os.makedirs(temp_dir, exist_ok=True)
+        filename = f"dist_plot_{uuid4().hex[:12]}.png"
+        save_path = os.path.join(temp_dir, filename)
 
-            kde = gaussian_kde(values)
-            x_range = np.linspace(0, max(1250, values.max() + 150), 600)
-            ax.plot(x_range, kde(x_range) * len(values) * 50,
-                    color="#C62828", linewidth=3.5, linestyle="-", alpha=0.9,
-                    label="Densidad estimada", zorder=4)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()   # Importante: liberar memoria
 
-        key_boundaries = [350, 450, 900]
-        for x in key_boundaries:
-            ax.axvline(x, color="#666666", linestyle="--", linewidth=1.8, alpha=0.7, zorder=2)
-
-        quality_centers = {
-            65: "Calidad 1", 150: "Calidad 2", 225: "Calidad 3", 325: "Calidad 4",
-            450: "Calidad 5", 575: "Calidad 6", 650: "Calidad 7", 750: "Calidad 8",
-            850: "Calidad 9", 1100: "Calidad 10"
-        }
-        fixed_y_pos = ax.get_ylim()[1] * 0.75
-        for x, label in quality_centers.items():
-            ax.text(x, fixed_y_pos, label,
-                    fontsize=17, fontweight='bold', color="#1a3c5e",
-                    ha='center', va='bottom', rotation=90,
-                    bbox=dict(facecolor='white', alpha=0.92, edgecolor='none', pad=4.2))
-
-        max_x = max(1250, values.max() + 150)
-        ax.set_xticks(np.arange(0, max_x + 100, 100))
-        ax.set_xticklabels([f"{int(x)}" for x in np.arange(0, max_x + 100, 100)], fontsize=16)
-
-        ax.set_xlabel("Tamaño medio de cristal (µm)", fontsize=24, labelpad=18)
-        ax.set_ylabel("Frecuencia", fontsize=24, labelpad=18)
-        ax.set_title("Distribución del tamaño de cristal por calidad",
-                     fontsize=30, pad=32, weight='bold', color="#0f2b4a")
-
-        ax.legend(fontsize=20, loc="upper right", frameon=True,
-                  edgecolor="#bbbbbb", facecolor="white", framealpha=0.98)
-
-        ax.grid(True, axis='y', alpha=0.4, linestyle="--", color="#dddddd")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.tick_params(axis='both', which='major', labelsize=18, pad=10)
-        ax.set_xlim(0, max_x)
-
-        plt.tight_layout()
-        plt.savefig(tmp.name, dpi=190, bbox_inches="tight", pad_inches=0.5)
-        plt.close(fig)
-
-        return tmp.name
+    return os.path.abspath(save_path)
 
 
 def image_keep_aspect(path, max_width_cm, max_height_cm):
@@ -126,41 +195,6 @@ import numpy as np
 from django.http import Http404
 
 
-# def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
-#     """
-#     Calcula los micrómetros por píxel después de redimensionar la imagen a 512x512.
-#     """
-#     # 1. Buscar la micrografía de forma segura
-#     micrografia = Micrografia.objects.filter(id=obj_id).first()
-    
-#     if micrografia is None:
-#         raise Http404(f"No existe Micrografia con id = {obj_id}")
-
-#     print(f"Micrografía encontrada: {micrografia.id}")
-
-#     if not micrografia.imagen:
-#         raise ValueError(f"La micrografía {obj_id} no tiene imagen asociada")
-
-#     # 2. Convertir el valor que viene del frontend a float (¡esto soluciona el error!)
-#     try:
-#         um_per_pix_original = float(um_per_pix_original)
-#     except (TypeError, ValueError):
-#         raise ValueError(f"um_by_px_original debe ser un número válido. Recibido: {um_per_pix_original}")
-
-#     # 3. Obtener dimensiones originales de la   
-#     with Image.open(micrografia.imagen.url) as img:
-#         original_width, original_height = img.size   # Mejor usar .size que convertir a array
-
-#     # 4. Calcular factor de escalado
-#     max_side_original = max(original_width, original_height)
-#     scale_factor = max_side_original / 512.0
-
-#     # 5. Cálculo final
-#     um_per_pix = um_per_pix_original * scale_factor
-
-#     print(f"Original: {max_side_original}px | Scale: {scale_factor:.3f} | µm/px final: {um_per_pix:.4f}")
-
-#     return round(um_per_pix, 4)
 
 
 def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
@@ -191,3 +225,81 @@ def get_um_by_px(obj_id: int, um_per_pix_original) -> float:
     um_per_pix = um_per_pix_original * scale_factor
 
     return round(um_per_pix, 4)
+
+
+# ================== CALIDADES ======================
+GRAIN_QUALITIES = [
+    (0, 90),       # Calidad 1
+    (100, 200),    # Calidad 2
+    (200, 250),    # Calidad 3
+    (300, 350),    # Calidad 4
+    (400, 500),    # Calidad 5
+    (550, 600),    # Calidad 6
+    (600, 700),    # Calidad 7
+    (700, 800),    # Calidad 8
+    (800, 900),    # Calidad 9
+    (901, float("inf")),  # Calidad 10
+]
+
+
+def get_quality(size):
+    for i, (low, high) in enumerate(GRAIN_QUALITIES, start=1):
+        if low <= size <= high:
+            return i
+    return None
+
+
+# ====================== NUEVA FUNCIÓN (la que pediste) ======================
+def create_quality_distribution_plot(qualities_list, 
+                                     title="Distribución de Calidades de Grano",
+                                     xlabel="Calidad de Grano",
+                                     ylabel="Frecuencia",
+                                     save_path=None):
+    """
+    Histograma de barras DISCRETO: Frecuencia (eje Y) contra Calidad (eje X = 1 a 10).
+    Usa el mismo estilo bonito que create_distribution_plot (seaborn + grid + valores en barras).
+    """
+    if not qualities_list:
+        return None
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from collections import Counter
+    from uuid import uuid4
+    import os
+
+    count = Counter(qualities_list)
+    qualities = list(range(1, 11))
+    frequencies = [count.get(q, 0) for q in qualities]
+
+    # Configuración visual idéntica a create_distribution_plot
+    plt.figure(figsize=(10, 6))
+    sns.set_style("whitegrid")
+    
+    ax = sns.barplot(x=qualities, y=frequencies, 
+                     color="#2C3E50", edgecolor="black", alpha=0.85)
+    
+    ax.set_title(title, fontsize=14, pad=20)
+    ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
+    ax.set_ylabel(ylabel, fontsize=12, fontweight='bold')
+    ax.set_xticks(qualities)
+
+    # Valores encima de cada barra
+    for i, freq in enumerate(frequencies):
+        if freq > 0:
+            ax.text(i, freq + max(frequencies)*0.02, f'{int(freq)}',
+                    ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+    plt.tight_layout()
+
+    # Guardar en carpeta temporal (igual que create_distribution_plot)
+    if save_path is None:
+        temp_dir = "temp_plots"
+        os.makedirs(temp_dir, exist_ok=True)
+        filename = f"quality_dist_plot_{uuid4().hex[:12]}.png"
+        save_path = os.path.join(temp_dir, filename)
+
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return os.path.abspath(save_path)
