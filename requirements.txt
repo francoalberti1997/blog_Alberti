@@ -32,6 +32,6 @@ psycopg2-binary>=2.9.0
 gunicorn>=22.0.0
 
 python-dotenv
-
+seaborn
 cloudinary==1.33.0
 
