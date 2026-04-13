@@ -32,3 +32,6 @@ regiones/
 request_test/
 
 results_v4_constante/
+
+temp_plots/
+*.pdf
