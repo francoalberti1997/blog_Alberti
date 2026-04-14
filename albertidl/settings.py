@@ -46,6 +46,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://alberti-tech.onrender.com',
     'https://alberti-tech.onrender.com', 
     "https://francoalberti97.pythonanywhere.com",    
+    "https://shela-unmultiplying-chandler.ngrok-free.dev",
     
 ]
 
@@ -60,6 +61,12 @@ CORS_ALLOWED_ORIGINS  = [
     'http://alberti-tech.onrender.com', 
     'https://alberti-tech.onrender.com', 
     "https://francoalberti97.pythonanywhere.com",
+    "https://shela-unmultiplying-chandler.ngrok-free.dev",
+]
+
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "ngrok-skip-browser-warning",
 ]
 
 # settings.py

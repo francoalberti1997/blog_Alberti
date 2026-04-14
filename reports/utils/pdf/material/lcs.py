@@ -230,7 +230,7 @@ def build_steel(data: dict) -> list:
     else:
         elements.append(Paragraph("⚠ No se generó histograma global (menos de 2 regiones)", normal))
 
-    elements.append(PageBreak())
+    # elements.append(PageBreak())
 
     # ====================== DETALLE POR REGIÓN ======================
     detailed_section = [Paragraph("Análisis detallado por región", h2), Spacer(1, 0.3 * cm)]
