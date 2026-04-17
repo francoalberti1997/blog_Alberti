@@ -21,7 +21,8 @@ import cloudinary.uploader
 
 # ====================== IMPORTS PARA EL PDF ======================
 
-BASE_PREDICT_URL = "https://francoalb-materialai.hf.space/segment/"
+BASE_PREDICT_URL = "https://albertitechnology-materialai.hf.space/segment/"
+
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 @shared_task

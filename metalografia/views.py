@@ -190,7 +190,8 @@ class MicrografiaViewSet(BaseCompanyViewSet):
         return super().partial_update(request, *args, **kwargs)
 
 
-BASE_PREDICT_URL = "https://francoalb-magnesia.hf.space/segment"
+BASE_PREDICT_URL = "https://albertitechnology-materialai.hf.space/segment/"
+
 
 class PredictView(APIView):
 
