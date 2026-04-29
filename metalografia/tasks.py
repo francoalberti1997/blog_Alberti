@@ -5,7 +5,9 @@ from django.core.files.base import ContentFile
 
 from reports.utils.pdf.report_builder import build_full_report_pdf
 from .models import Micrografia_mask
+# from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
 from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
+
 from django.core.mail import EmailMessage
 from django.conf import settings
 import os
@@ -84,7 +86,6 @@ def process_micrografia_mask(mask_id):
 
     return micrografia.id
 
-
 @shared_task()
 def measure_grain_size(micrografia):
     print("INICIANDO PROCESO DE MEDICIÓN")
@@ -104,11 +105,12 @@ def measure_grain_size(micrografia):
 
     mask_file = mask_instance.imagen
 
+
     results = generar_grilla_intercepciones_constantes(
         img_file=img_file,
         mask_file=mask_file,
         safety_margin_px=5,
-        num_rectas_objetivo=100,
+        num_rectas_objetivo=300,
     )
 
     micro_measure, _ = MicrographyMeasure.objects.update_or_create(
@@ -150,9 +152,9 @@ def measure_grain_size(micrografia):
 
     return 1
 
-
 @shared_task
 def generate_microstructural_report_pdf(pdf_id: int):
+    
 
     print(f"Generando PDF ESQUELETO para ReportPDF id: {pdf_id}")
 
