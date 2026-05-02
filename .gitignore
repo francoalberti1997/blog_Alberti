@@ -35,3 +35,8 @@ results_v4_constante/
 
 temp_plots/
 *.pdf
+
+# Local-only dev workflow
+/docker-compose.local.yml
+/README.local.md
+/metalografia/management/
