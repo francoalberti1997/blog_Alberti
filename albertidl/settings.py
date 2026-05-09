@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import cloudinary
 
@@ -85,11 +88,13 @@ INSTALLED_APPS = [
     'blogs',
     'corsheaders',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'metalografia',
     "rest_framework.authtoken",
     "member",
     'reports',
     'cloudinary',
+    'analytics',
 ]
 
 MIDDLEWARE = [
@@ -128,26 +133,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'albertidl.wsgi.application'
 
 
-# Database
+# Database — Neon PostgreSQL
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+from urllib.parse import urlparse, parse_qsl
+
+tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': tmpPostgres.path.replace('/', ''),
+        'USER': tmpPostgres.username,
+        'PASSWORD': tmpPostgres.password,
+        'HOST': tmpPostgres.hostname,
+        'PORT': 5432,
+        'OPTIONS': dict(parse_qsl(tmpPostgres.query)),
+        'CONN_MAX_AGE': 600,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
-
-# import os
-# import dj_database_url
-
+# SQLite fallback (para desarrollo offline si fuera necesario)
 # DATABASES = {
-#     'default': dj_database_url.config(
-#         default=os.getenv('DATABASE_URL'),
-#         conn_max_age=600,           # recomendado
-#         ssl_require=True            # importante para Render
-#     )
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
 # }
 
 # Password validation
@@ -237,11 +249,25 @@ import os
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+}
+
+# ====================== JWT ======================
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,          # cada refresh devuelve un nuevo refresh token
+    'BLACKLIST_AFTER_ROTATION': True,        # invalida el refresh token anterior
+    'UPDATE_LAST_LOGIN': True,               # actualiza last_login del user
+
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
 }
 
 
