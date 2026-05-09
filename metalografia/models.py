@@ -49,7 +49,13 @@ class Micrografia(models.Model):
     nombre = models.CharField(max_length=100)
     imagen = CloudinaryField('image')
     um_by_px = models.FloatField(null=True, blank=True) #pixeles por micrómetro
-
+    polygon_file = models.FileField(
+            upload_to='polygons/%Y/%m/%d/', 
+            null=True, 
+            blank=True,
+            verbose_name="Archivo de Polígonos"
+        )
+    
     def __str__(self):
         return f"{self.nombre} id: {self.id}"
 

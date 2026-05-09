@@ -3,21 +3,15 @@ from celery import shared_task
 import requests
 from django.core.files.base import ContentFile
 
-from reports.utils.pdf.report_builder import build_full_report_pdf
 from .models import Micrografia_mask
 # from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
-from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
+# from algoritmos.tamaño_grano.astm_e112_test import generar_grilla_intercepciones_constantes
+from algoritmos.tamaño_grano.astm_e112_v2 import generar_rectas_obb_produccion
 
-from django.core.mail import EmailMessage
-from django.conf import settings
 import os
 from reports.models import ReportPDF
 from .models import Region, Muestra, Micrografia, MicrographyMeasure
-import traceback
 from reports.utils.send_mail import send_report_email
-from collections import defaultdict, Counter
-import numpy as np
-from datetime import datetime
 import cloudinary                 
 import cloudinary.uploader         
 
@@ -86,32 +80,74 @@ def process_micrografia_mask(mask_id):
 
     return micrografia.id
 
+
+
 @shared_task()
-def measure_grain_size(micrografia):
+def measure_grain_size(micrografia_id):
     print("INICIANDO PROCESO DE MEDICIÓN")
-    micrografia = Micrografia.objects.get(id=micrografia)
+    micrografia = Micrografia.objects.get(id=micrografia_id)
 
     if not micrografia.imagen:
-        raise ValueError(f"La micrografía {micrografia} no tiene imagen cargada")
+        raise ValueError(f"La micrografía {micrografia} no tiene imagen")
 
     img_file = micrografia.imagen.url
+    mask_file = micrografia.micrografias_mask.imagen.url
 
-    if not hasattr(micrografia, 'micrografias_mask'):
-        raise ValueError(f"No existe relación micrografias_mask en {micrografia}")
+    # ====================== OBTENER POLÍGONOS CON TOKEN HF ======================
+    polygon_file = None
 
-    mask_instance = micrografia.micrografias_mask
-    if not mask_instance.imagen:
-        raise ValueError(f"La máscara de {micrografia} no tiene archivo cargado")
+    try:
+        image_url = micrografia.micrografias_mask.imagen.url
+        img_response = requests.get(image_url, timeout=15)
+        img_response.raise_for_status()
 
-    mask_file = mask_instance.imagen
+        HF_TOKEN = os.getenv("HF_TOKEN")   # Asegúrate que esté en .env
 
+        if not HF_TOKEN:
+            print("⚠️ HF_TOKEN no encontrado en variables de entorno")
 
-    results = generar_grilla_intercepciones_constantes(
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}"
+        }
+
+        print("Llamando endpoint OBB con token HF...")
+        response = requests.post(
+            "https://albertitechnology-materialai.hf.space/oob/",   # ← Cambia si es necesario
+            headers=headers,
+            files={"file": ("image.png", img_response.content, "image/png")},
+            timeout=40
+        )
+        response.raise_for_status()
+
+        txt_content = response.text.strip()
+
+        if not txt_content:
+            print("⚠️ El endpoint devolvió texto vacío")
+            polygon_file = None
+        else:
+            # Guardar como archivo en el modelo
+            filename = f"polygons_{micrografia.id}.txt"
+            
+            micrografia.polygon_file.save(
+                filename,
+                ContentFile(txt_content.encode('utf-8')),
+                save=True
+            )
+            polygon_file = micrografia.polygon_file.path
+            print(f"✅ Polígonos guardados: {filename} ({len(txt_content.splitlines())} líneas)")
+
+    except Exception as e:
+        print(f"❌ Error llamando endpoint OBB: {e}")
+        polygon_file = None
+
+    results = generar_rectas_obb_produccion(
         img_file=img_file,
         mask_file=mask_file,
-        safety_margin_px=5,
-        num_rectas_objetivo=300,
+        polygon_file=polygon_file,
+        num_rectas_por_caja=150,      # baja un poco para pruebas
+        min_intercept_um=5.0
     )
+
 
     micro_measure, _ = MicrographyMeasure.objects.update_or_create(
         micrografia=micrografia,
@@ -122,7 +158,6 @@ def measure_grain_size(micrografia):
             "distribution_quantiles": results["distribution_quantiles"],   
         }
     )
-
 
     if results["visualization_bytes"]:
         upload_result = cloudinary.uploader.upload(

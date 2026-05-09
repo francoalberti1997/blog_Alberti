@@ -47,6 +47,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://alberti-tech.onrender.com', 
     "https://francoalberti97.pythonanywhere.com",    
     "https://shela-unmultiplying-chandler.ngrok-free.dev",
+    "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
     
 ]
 
@@ -62,6 +63,7 @@ CORS_ALLOWED_ORIGINS  = [
     'https://alberti-tech.onrender.com', 
     "https://francoalberti97.pythonanywhere.com",
     "https://shela-unmultiplying-chandler.ngrok-free.dev",
+    "https://superdeclamatory-claris-prolongably.ngrok-free.dev",
 ]
 
 from corsheaders.defaults import default_headers
